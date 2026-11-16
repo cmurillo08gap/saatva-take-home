@@ -1,0 +1,7 @@
+{
+  "name": "@saatva/contracts",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Types-only API contracts shared by the BFF and the web app.",
+  "types": "index.d.ts"
+}

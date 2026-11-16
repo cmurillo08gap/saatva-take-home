@@ -6,7 +6,8 @@
   "workspaces": [
     "services/upstream",
     "apps/api",
-    "apps/web"
+    "apps/web",
+    "packages/*"
   ],
   "scripts": {
     "dev": "concurrently -k -n upstream,api,web -c gray,blue,magenta \"npm run dev -w services/upstream\" \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",

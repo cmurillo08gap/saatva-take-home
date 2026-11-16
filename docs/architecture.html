@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture</title>
+<style>
+  :root { --bg:#f7f5f2; --panel:#fff; --text:#212121; --muted:#6b6b6b; --border:#e2ddd6; --accent:#b98a55; --accent-soft:#f3e8d9;
+    --req:#2f6fd6; --res:#2e8b57; --err:#d03b3b; --work:#d99a1c; --node:#fff; --node-stroke:#cfc7bc; --code:#f1eee9; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#17171a; --panel:#212125; --text:#ececec; --muted:#9b9b9f; --border:#38383e; --accent:#d4aa79; --accent-soft:#34291b;
+    --req:#6ea2ff; --res:#55c28a; --err:#ff6b6b; --work:#f0b648; --node:#2a2a30; --node-stroke:#4a4a52; --code:#2b2b31; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  header { padding:14px 24px; background:var(--panel); border-bottom:1px solid var(--border); }
+  header h1 { margin:0; font-size:18px; font-weight:600; }
+  header p { margin:2px 0 0; color:var(--muted); font-size:12px; }
+  main { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:16px; padding:16px 24px 32px; max-width:1400px; margin:0 auto; }
+  @media (max-width:950px) { main { grid-template-columns:1fr; padding:12px 16px 24px; } }
+  .col { display:flex; flex-direction:column; gap:16px; min-width:0; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 16px; }
+  .card h2 { margin:0 0 10px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600; display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  svg { width:100%; height:auto; display:block; }
+  .node rect { fill:var(--node); stroke:var(--node-stroke); stroke-width:1.5; rx:10; transition:stroke .15s; }
+  .node { cursor:pointer; }
+  .node.selected rect { stroke:var(--accent); stroke-width:2.5; }
+  .node.active rect { stroke:var(--req); stroke-width:3; filter:drop-shadow(0 0 6px var(--req)); }
+  .node.pulse rect { stroke:var(--work); stroke-width:3; filter:drop-shadow(0 0 8px var(--work)); }
+  .node text.t { font-weight:600; font-size:14px; fill:var(--text); }
+  .node text.s { font-size:11px; fill:var(--muted); }
+  .edge { stroke:var(--node-stroke); stroke-width:1.5; stroke-dasharray:4 4; }
+  .bubble { font-size:11px; fill:var(--work); font-weight:600; text-anchor:middle; }
+  .plabel { font-size:11px; text-anchor:middle; font-weight:600; paint-order:stroke; stroke:var(--panel); stroke-width:3px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:6px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; }
+  button.act { border:1px solid var(--border); background:var(--panel); color:var(--text); padding:7px 12px; border-radius:8px; cursor:pointer; font:inherit; }
+  button.act:hover { border-color:var(--accent); }
+  button.act.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  select { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:4px; }
+  #log { list-style:none; margin:0; padding:0; max-height:280px; overflow:auto; font-size:12.5px; }
+  #log li { display:grid; grid-template-columns:10px 1fr auto; gap:8px; padding:4px; border-bottom:1px solid var(--border); cursor:pointer; align-items:baseline; }
+  #log li:hover { background:var(--code); }
+  #log li .dot { width:8px; height:8px; border-radius:50%; margin-top:5px; }
+  #log li .path { color:var(--muted); font-size:11px; }
+  #log li.hdr { cursor:default; font-weight:600; color:var(--accent); border-bottom:0; }
+  pre { margin:0; background:var(--code); border-radius:8px; padding:10px; font:12px/1.45 ui-monospace,Menlo,monospace; overflow:auto; max-height:220px; white-space:pre-wrap; word-break:break-word; }
+  code { background:var(--code); padding:1px 5px; border-radius:4px; font:12px ui-monospace,Menlo,monospace; }
+  ul { margin:6px 0; padding-left:18px; }
+  .ctl { display:grid; grid-template-columns:auto 1fr auto; gap:6px 10px; align-items:center; font-size:12.5px; }
+  .ctl input[type=range] { width:100%; accent-color:var(--accent); }
+  .ctl output { font:12px ui-monospace,Menlo,monospace; min-width:64px; text-align:right; }
+  .ctl .chk { grid-column:1/-1; display:flex; gap:14px; flex-wrap:wrap; }
+  .tl { margin-top:4px; font-size:12px; }
+  .tl .row { display:grid; grid-template-columns:70px 1fr; gap:8px; align-items:center; margin:5px 0; }
+  .tl .track { position:relative; height:16px; background:var(--code); border-radius:4px; }
+  .tl .bar { position:absolute; left:0; top:0; height:100%; border-radius:4px; }
+  .tl .tmo { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--err); }
+  .hint { font-size:12px; color:var(--muted); margin:8px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Architecture</h1>
+  <p>The current architecture, extending the <a href="base-architecture.html" style="color:var(--accent)">base</a>. Browser → Next.js web → NestJS BFF → upstream catalog + content. Run a scenario to watch a request travel, change the upstream conditions to see how the BFF reacts, or click a box for details.</p>
+</header>
+<main>
+  <div class="col">
+    <div class="card">
+      <h2><span>Request flow</span><span id="runstate" style="text-transform:none;letter-spacing:0">idle</span></h2>
+      <svg id="diagram" viewBox="0 0 900 380" role="img" aria-label="Architecture diagram"></svg>
+      <div class="legend">
+        <span><i style="background:var(--req)"></i>request</span>
+        <span><i style="background:var(--res)"></i>success</span>
+        <span><i style="background:var(--err)"></i>error</span>
+        <span><i style="background:var(--work)"></i>work inside a service</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span>Upstream conditions</span><button class="act" id="reset" style="padding:2px 8px">reset</button></h2>
+      <div class="ctl">
+        <label for="latCat">Catalog latency</label><input id="latCat" type="range" min="0" max="10000" step="100" value="150"><output id="latCatO"></output>
+        <label for="latCon">Content latency</label><input id="latCon" type="range" min="0" max="10000" step="100" value="150"><output id="latConO"></output>
+        <label for="tmo">BFF timeout</label><input id="tmo" type="range" min="500" max="10000" step="100" value="3000"><output id="tmoO"></output>
+        <div class="chk">
+          <label><input type="checkbox" id="failCat"> catalog fails (503)</label>
+          <label><input type="checkbox" id="failCon"> content fails (503)</label>
+        </div>
+      </div>
+      <p class="hint">Simulation of <code>GET /api/products</code>. Real-run equivalents: <code>UPSTREAM_LATENCY_MS</code> (applies to both services), <code>UPSTREAM_FAIL_SERVICE=catalog|content</code>, and the BFF's <code>UPSTREAM_TIMEOUT_MS</code>. A request that takes longer than the timeout is aborted and counts as a failure of that service.</p>
+    </div>
+    <div class="card">
+      <h2>Timeline of the last products request</h2>
+      <div class="tl" id="tl"><span class="hint">Run “Browser: GET /api/products” or “Server-side apiGet()”.</span></div>
+    </div>
+    <div class="card">
+      <h2><span>Scenarios</span>
+        <label style="text-transform:none;letter-spacing:0">speed <select id="speed"><option value="0.6">slow</option><option value="1" selected>normal</option><option value="2.5">fast</option></select></label></h2>
+      <div class="btns" id="scenarios"></div>
+      <p class="hint">Animation time is compressed; the log and timeline show the simulated milliseconds.</p>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card"><h2>Selected component</h2><div id="details"></div></div>
+    <div class="card">
+      <h2><span>Event log</span><button class="act" id="clear" style="padding:2px 8px">clear</button></h2>
+      <ul id="log"></ul>
+    </div>
+    <div class="card">
+      <h2><span>Payload</span><span id="inspLabel" style="text-transform:none;letter-spacing:0"></span></h2>
+      <pre id="insp">Click a log row to see its payload.</pre>
+    </div>
+  </div>
+</main>
+
+<script>
+'use strict';
+const NODES = {
+  browser: { x:20,  y:140, w:130, h:90, title:'Browser',     sub:'user agent' },
+  web:     { x:235, y:140, w:150, h:90, title:'Next.js web', sub:'apps/web :3000' },
+  bff:     { x:470, y:140, w:150, h:90, title:'NestJS BFF',  sub:'apps/api :4000 /api' },
+  catalog: { x:725, y:30,  w:155, h:85, title:'Catalog',     sub:'upstream :4100' },
+  content: { x:725, y:265, w:155, h:85, title:'Content',     sub:'upstream :4100' },
+};
+const EDGES = [['browser','web'],['web','bff'],['bff','catalog'],['bff','content']];
+const DETAILS = {
+  browser: `<p><b>Browser.</b> Only talks to the Next.js app. Client-side requests use relative <code>/api/...</code> URLs.</p>`,
+  web: `<p><b>Next.js · apps/web</b></p><ul>
+    <li><code>next.config.mjs</code> <code>rewrites()</code> proxies browser <code>/api/*</code> to the BFF.</li>
+    <li><code>lib/api.ts#apiGet</code> calls the BFF directly when running on the server (rewrites only apply to browser requests).</li>
+    <li><code>app/page.tsx</code>, <code>components/Header.tsx</code>, <code>components/ProductConfigurator.tsx</code> still contain the starting TODOs; the configurator doesn't consume the products endpoint yet.</li></ul>`,
+  bff: `<p><b>NestJS BFF · apps/api</b> (global prefix <code>/api</code>)</p><ul>
+    <li><code>HealthController</code>: <code>GET /api/health</code>.</li>
+    <li><code>ProductsController</code> → <code>ProductsService.getProducts()</code>: fetches both upstreams in parallel (<code>Promise.allSettled</code>), then merges them.</li>
+    <li><code>product.mapper.ts</code>: joins on the trimmed, lowercased handle, drops content-only and discontinued products, reads prices and ratings defensively, sanitizes the description HTML.</li>
+    <li><code>UpstreamClient</code>: each request aborts after <code>UPSTREAM_TIMEOUT_MS</code> (default 3000).</li>
+    <li>Response type <code>ProductsResponse</code> comes from <code>packages/contracts</code> (types only).</li></ul>
+    <p>Catalog failure or timeout → <code>503</code>. Content failure → <code>200</code> with the content fields <code>null</code> / <code>[]</code>.</p>`,
+  catalog: `<p><b>Catalog upstream</b> · <code>GET /catalog/v1/products</code></p><p>Third-party mock: products and pricing. Don't modify.</p>`,
+  content: `<p><b>Content upstream</b> · <code>GET /content/v1/products</code></p><p>Third-party mock: marketing copy and reviews. Don't modify.</p>`,
+};
+let speed = 1, busy = 0, queue = Promise.resolve(), selected = 'bff';
+
+const $ = (s) => document.querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+const el = (t, a = {}, text) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (text != null) e.textContent = text; return e; };
+const center = (n) => ({ x: NODES[n].x + NODES[n].w / 2, y: NODES[n].y + NODES[n].h / 2 });
+const COLORS = { req:'var(--req)', res:'var(--res)', err:'var(--err)', work:'var(--work)' };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+function boundary(n, dx, dy) {
+  const o = NODES[n], c = center(n);
+  const s = Math.min(dx === 0 ? Infinity : (o.w / 2 + 3) / Math.abs(dx), dy === 0 ? Infinity : (o.h / 2 + 3) / Math.abs(dy));
+  return { x: c.x + dx * s, y: c.y + dy * s };
+}
+function edgePts(a, b) {
+  const A = center(a), B = center(b);
+  let dx = B.x - A.x, dy = B.y - A.y; const len = Math.hypot(dx, dy); dx /= len; dy /= len;
+  const nx = -dy * 7, ny = dx * 7, p0 = boundary(a, dx, dy), p1 = boundary(b, -dx, -dy);
+  return [{ x: p0.x + nx, y: p0.y + ny }, { x: p1.x + nx, y: p1.y + ny }];
+}
+function build() {
+  const svg = $('#diagram');
+  for (const [a, b] of EDGES) { const A = center(a), B = center(b); svg.append(el('line', { class:'edge', x1:A.x, y1:A.y, x2:B.x, y2:B.y })); }
+  svg.append(el('text', { x:428, y:128, 'font-size':10, fill:'var(--muted)', 'text-anchor':'middle' }, 'server-side direct'));
+  svg.append(el('text', { x:428, y:246, 'font-size':10, fill:'var(--muted)', 'text-anchor':'middle' }, 'browser /api/* via rewrite'));
+  for (const id in NODES) {
+    const o = NODES[id], g = el('g', { class:'node', id:'n-' + id, tabindex:0, role:'button', 'aria-label':o.title });
+    g.append(el('rect', { x:o.x, y:o.y, width:o.w, height:o.h }));
+    g.append(el('text', { class:'t', x:o.x + o.w / 2, y:o.y + 38, 'text-anchor':'middle' }, o.title));
+    g.append(el('text', { class:'s', x:o.x + o.w / 2, y:o.y + 58, 'text-anchor':'middle' }, o.sub));
+    const pick = () => { selected = id; showDetails(); };
+    g.addEventListener('click', pick);
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+    svg.append(g);
+  }
+  svg.append(el('g', { id:'packets' }), el('g', { id:'bubbles' }));
+}
+function showDetails() {
+  $('#details').innerHTML = DETAILS[selected];
+  for (const id in NODES) $('#n-' + id).classList.toggle('selected', id === selected);
+}
+
+const dur = (ms) => (140 + Math.min(ms, 1500) * 0.5) / speed;
+function animate(a, b, kind, label, ms) {
+  return new Promise((resolve) => {
+    const [p0, p1] = edgePts(a, b), c = el('circle', { r:6, fill:COLORS[kind] }), t = el('text', { class:'plabel', fill:COLORS[kind] }, label);
+    $('#packets').append(c, t);
+    const d = dur(ms), t0 = performance.now();
+    $('#n-' + a).classList.add('active');
+    (function frame(now) {
+      const k = Math.min(1, (now - t0) / d), x = p0.x + (p1.x - p0.x) * k, y = p0.y + (p1.y - p0.y) * k;
+      c.setAttribute('cx', x); c.setAttribute('cy', y); t.setAttribute('x', x); t.setAttribute('y', y - 11);
+      if (k < 1) requestAnimationFrame(frame); else { c.remove(); t.remove(); $('#n-' + a).classList.remove('active'); resolve(); }
+    })(t0);
+  });
+}
+function pulse(n, label, ms) {
+  return new Promise((resolve) => {
+    const node = $('#n-' + n), o = NODES[n], b = el('text', { class:'bubble', x:o.x + o.w / 2, y:o.y - 8 }, label);
+    node.classList.add('pulse'); $('#bubbles').append(b);
+    setTimeout(() => { node.classList.remove('pulse'); b.remove(); resolve(); }, (350 + Math.min(ms, 800)) / speed);
+  });
+}
+function inspect(label, body) { $('#inspLabel').textContent = label; $('#insp').textContent = typeof body === 'string' ? body : JSON.stringify(body, null, 2); }
+function header(text) { const li = document.createElement('li'); li.className = 'hdr'; li.innerHTML = `<span></span><span>${esc(text)}</span><span></span>`; $('#log').append(li); }
+async function hop(from, to, label, o = {}) {
+  const kind = o.kind || 'req', ms = o.ms ?? 5, text = o.note || label;
+  const li = document.createElement('li');
+  li.innerHTML = `<span class="dot" style="background:${COLORS[kind]}"></span><span>${esc(text)}<br><span class="path">${from === to ? from + ' (internal)' : from + ' → ' + to}</span></span><span class="path">+${ms}ms</span>`;
+  if (o.body !== undefined) { li.onclick = () => inspect(label, o.body); inspect(label, o.body); }
+  $('#log').append(li); $('#log').scrollTop = 1e9;
+  if (from === to) await pulse(from, label, ms); else await animate(from, to, kind, label, ms);
+}
+
+/* Simulation of the products route. */
+const $v = (id) => +$('#' + id).value;
+const conds = () => ({ latCat: $v('latCat'), latCon: $v('latCon'), tmo: $v('tmo'), failCat: $('#failCat').checked, failCon: $('#failCon').checked });
+function settle(lat, tmo, fail) {
+  if (lat > tmo) return { ok: false, at: tmo, why: 'timed out after ' + tmo + 'ms' };
+  if (fail) return { ok: false, at: Math.min(lat, 20), why: '503 from upstream' };
+  return { ok: true, at: lat };
+}
+const PRODUCTS = [
+  { id:'saatva-classic', name:'Saatva Classic', priceCents:99900, compareAtPriceCents:null, currency:'USD', imageUrl:'/images/classic-carousel.jpg', headline:'Our flagship luxury innerspring', descriptionHtml:'<p>Hotel-quality <strong>dual coil-on-coil</strong> construction…</p><ul><li>Plush Soft</li>…</ul>', rating:{ average:4.9, count:5231 }, badges:['Best seller'] },
+  { id:'loom-and-leaf', name:'Loom & Leaf', priceCents:119900, compareAtPriceCents:129900, currency:'USD', imageUrl:'/images/loom-carousel.jpg', headline:'Ultra-premium memory foam', descriptionHtml:'<p>Contouring <strong>memory foam</strong>…</p>', rating:{ average:4, count:1876 }, badges:['Pressure relief'] },
+  { id:'zenhaven', name:'Zenhaven', priceCents:159900, compareAtPriceCents:null, currency:'USD', imageUrl:'/images/zen-carousel.jpg', headline:'Flippable natural latex, two firmness levels in one', descriptionHtml:'<p>Our <strong>100% natural Talalay latex</strong>…</p>', rating:{ average:4.5, count:2140 }, badges:['Natural latex'] },
+];
+const NO_COPY = PRODUCTS.map((p) => ({ ...p, headline:null, descriptionHtml:null, rating:null, badges:[] }));
+const ERR503 = { statusCode: 503, message: 'Products are temporarily unavailable', error: 'Service Unavailable' };
+
+function timeline(c, cat, con, total, status) {
+  const max = Math.max(c.tmo, cat.at, con.at, total) * 1.05;
+  const pct = (v) => (v / max * 100).toFixed(1) + '%';
+  const bar = (name, r, ms) => `<div class="row"><span>${name}</span><div class="track"><div class="bar" style="width:${pct(ms)};background:${r.ok ? 'var(--res)' : 'var(--err)'}"></div><div class="tmo" style="left:${pct(c.tmo)}" title="timeout"></div></div></div>`;
+  $('#tl').innerHTML = bar('catalog', cat, cat.at) + bar('content', con, con.at) +
+    `<div class="row"><span>response</span><div class="track"><div class="bar" style="width:${pct(total)};background:${status === 200 ? 'var(--accent)' : 'var(--err)'}"></div><div class="tmo" style="left:${pct(c.tmo)}"></div></div></div>` +
+    `<p class="hint">Red line = timeout (${c.tmo}ms). Both requests run in parallel, so the response waits for the slower one: ${total}ms → <b>${status}</b>.</p>`;
+}
+
+/* Runs the BFF side. `from` is who called the BFF (browser path goes through web). */
+async function productsFlow(from) {
+  const c = conds(), cat = settle(c.latCat, c.tmo, c.failCat), con = settle(c.latCon, c.tmo, c.failCon);
+  const total = Math.max(cat.at, con.at);
+  await hop('bff', 'bff', 'ProductsService.getProducts()', { kind: 'work', ms: 1, note: 'Promise.allSettled([catalog, content])' });
+  await Promise.all([
+    (async () => {
+      await hop('bff', 'catalog', 'GET /catalog/v1/products', { ms: 5 });
+      await hop('catalog', 'catalog', cat.ok ? 'serving' : 'slow / failing', { kind: cat.ok ? 'work' : 'err', ms: cat.at, note: 'catalog ' + (cat.ok ? 'answers after ' + cat.at + 'ms' : cat.why) });
+      await hop('catalog', 'bff', cat.ok ? '200' : 'failed', { kind: cat.ok ? 'res' : 'err', ms: 5, note: cat.ok ? 'catalog 200' : 'catalog: ' + cat.why });
+    })(),
+    (async () => {
+      await hop('bff', 'content', 'GET /content/v1/products', { ms: 5 });
+      await hop('content', 'content', con.ok ? 'serving' : 'slow / failing', { kind: con.ok ? 'work' : 'err', ms: con.at, note: 'content ' + (con.ok ? 'answers after ' + con.at + 'ms' : con.why) });
+      await hop('content', 'bff', con.ok ? '200' : 'failed', { kind: con.ok ? 'res' : 'err', ms: 5, note: con.ok ? 'content 200' : 'content: ' + con.why });
+    })(),
+  ]);
+  let status, body;
+  if (!cat.ok) {
+    status = 503; body = ERR503;
+    await hop('bff', 'bff', 'catalog unavailable', { kind: 'err', ms: 1, note: 'Nothing sellable without prices → ServiceUnavailableException (generic message, no upstream named)' });
+  } else {
+    status = 200;
+    if (!con.ok) {
+      body = { products: NO_COPY };
+      await hop('bff', 'bff', 'content unavailable', { kind: 'work', ms: 1, note: 'Warn and continue: headline, descriptionHtml, rating → null; badges → []' });
+    } else {
+      body = { products: PRODUCTS };
+      await hop('bff', 'bff', 'merge + normalize', { kind: 'work', ms: 2, note: 'Join on lowercased handle (Zenhaven/zenhaven); drop content-only saatva-youth; "4.0"/"1876" → numbers; sanitize HTML; sale 119900 vs list 129900' });
+    }
+  }
+  timeline(c, cat, con, total, status);
+  const kind = status === 200 ? 'res' : 'err';
+  return { status, body, kind, total };
+}
+
+const SCENARIOS = [
+  { id: 'page', label: 'Load page (GET /)', primary: true, run: async () => {
+    header('Browser loads the page');
+    await hop('browser', 'web', 'GET /');
+    await hop('web', 'web', 'render page.tsx', { kind: 'work', note: 'app/page.tsx renders <ProductConfigurator/>; it does not consume /api/products yet' });
+    await hop('web', 'browser', '200 HTML', { kind: 'res', body: '<section><h1>Choose Your Mattress</h1></section>' });
+  } },
+  { id: 'health', label: 'Health check', run: async () => {
+    header('GET /api/health from the browser');
+    await hop('browser', 'web', 'GET /api/health');
+    await hop('web', 'bff', 'rewrite → :4000');
+    await hop('bff', 'bff', 'HealthController', { kind: 'work', ms: 1 });
+    await hop('bff', 'web', '200', { kind: 'res', body: { status: 'ok' } });
+    await hop('web', 'browser', '200', { kind: 'res', body: { status: 'ok' } });
+  } },
+  { id: 'client', label: 'Browser: GET /api/products', run: async () => {
+    header('Client-side fetch through the rewrite');
+    await hop('browser', 'web', 'GET /api/products');
+    await hop('web', 'bff', 'rewrite → :4000');
+    const r = await productsFlow('web');
+    await hop('bff', 'web', String(r.status), { kind: r.kind, ms: r.total, body: r.body });
+    await hop('web', 'browser', String(r.status), { kind: r.kind, ms: 2, body: r.body });
+  } },
+  { id: 'server', label: 'Server-side apiGet()', run: async () => {
+    header('Server component calls the BFF directly');
+    await hop('web', 'bff', 'GET /api/products (direct)', { note: 'lib/api.ts#apiGet on the server uses API_URL, not the rewrite' });
+    const r = await productsFlow('web');
+    await hop('bff', 'web', String(r.status), { kind: r.kind, ms: r.total, body: r.body });
+  } },
+];
+
+const fmt = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + ' s' : v + ' ms');
+function syncOut() { $('#latCatO').textContent = fmt($v('latCat')); $('#latConO').textContent = fmt($v('latCon')); $('#tmoO').textContent = fmt($v('tmo')); }
+for (const id of ['latCat', 'latCon', 'tmo']) $('#' + id).oninput = syncOut;
+$('#reset').onclick = () => { $('#latCat').value = $('#latCon').value = 150; $('#tmo').value = 3000; $('#failCat').checked = $('#failCon').checked = false; syncOut(); };
+syncOut();
+
+function run(fn) {
+  busy++; $('#runstate').textContent = '● running…';
+  queue = queue.then(fn).catch(console.error).finally(() => { if (--busy === 0) $('#runstate').textContent = 'idle'; });
+}
+build(); showDetails();
+$('#scenarios').innerHTML = SCENARIOS.map((s) => `<button class="act${s.primary ? ' primary' : ''}" data-id="${s.id}">${esc(s.label)}</button>`).join('');
+$('#scenarios').onclick = (e) => { const b = e.target.closest('button'); if (b) run(SCENARIOS.find((s) => s.id === b.dataset.id).run); };
+$('#speed').onchange = (e) => { speed = +e.target.value; };
+$('#clear').onclick = () => { $('#log').innerHTML = ''; };
+</script>
+</body>
+</html>

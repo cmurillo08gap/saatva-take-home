@@ -1,6 +1,6 @@
 # Base architecture
 
-The starting architecture, before any implementation work. A short map of how the pieces fit. A new architecture/plan doc will be added when building starts. For an interactive version, open [`base-architecture.html`](base-architecture.html).
+The starting architecture, before any implementation work. A short map of how the pieces fit. The architecture as it evolves lives in [`architecture.md`](architecture.md). For an interactive version, open [`base-architecture.html`](base-architecture.html).
 
 ```mermaid
 flowchart LR

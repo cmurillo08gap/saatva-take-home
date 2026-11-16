@@ -8,7 +8,7 @@ The repo is ready to send: it runs from a clean checkout, and the docs explain w
 
 ## Scope
 
-- New architecture doc for the final state (the follow-up that `docs/base-architecture.md` mentions), with an updated diagram.
+- Final pass on `docs/architecture.md` (the living doc that extends the frozen `docs/base-architecture.md`, updated in each phase), with an updated diagram.
 - Trade-offs and decisions, pulled from the decision log.
 - "With more time / a real data store" notes for the pairing session (C3).
 - Update `CLAUDE.md` and README pointers where needed.

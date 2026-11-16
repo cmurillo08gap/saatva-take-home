@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Saatva storefront exercise: a Next.js frontend, a NestJS BFF, and mock third-party upstream services. See `README.md` for the brief and `docs/base-architecture.md` (+ `docs/base-architecture.html`) for the initial architecture, before implementation.
+Saatva storefront exercise: a Next.js frontend, a NestJS BFF, and mock third-party upstream services. See `README.md` for the brief and `docs/base-architecture.md` (+ `docs/base-architecture.html`) for the initial architecture, before implementation (frozen), and `docs/architecture.md` for the current one.
 
 ## Commands
 

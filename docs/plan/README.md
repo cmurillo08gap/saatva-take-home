@@ -6,7 +6,7 @@ The phased plan for building the specs in [`../take-home-specs.md`](../take-home
 
 | Done | Phase | Specs | Status | Reviewed |
 | --- | --- | --- | --- | --- |
-| [ ] | [1. Products BFF](phase-1-products-bff.md) | R1 · C1 C2 C4 | Not started | — |
+| [x] | [1. Products BFF](phase-1-products-bff.md) | R1 · C1 C2 C4 | Accepted | 2026-11-16 |
 | [ ] | [2. Configurator UI](phase-2-configurator-ui.md) | R2 · C1 C2 | Not started | — |
 | [ ] | [3. Cart core](phase-3-cart-core.md) | R3 R7 · C3 | Not started | — |
 | [ ] | [4. Cart view](phase-4-cart-view.md) | R4 R5 R6 · C3 | Not started | — |
@@ -50,6 +50,7 @@ Rules for Claude in every session:
 - **Never set `Accepted` or tick Done without the developer's explicit approval in chat for that phase.** Ask first every time. An earlier approval doesn't carry over to another phase or a later change.
 - **Don't implement a phase unless its status is `Planned`.** If asked to implement a phase that isn't, stop and suggest planning it in plan mode first.
 - **Don't implement in the session that planned the phase.** Suggest a new session in accept-edits mode instead.
+- **Keep `docs/architecture.md` current.** Each phase updates it to match the code. `docs/base-architecture.md` is the frozen starting snapshot; never edit it.
 - **No silent scope changes.** Anything added, dropped or changed during implementation goes back into the phase file and is flagged in its Review section.
 
 ## Decision log
@@ -57,6 +58,10 @@ Rules for Claude in every session:
 | Date | Decision | Phase |
 | --- | --- | --- |
 | 2026-11-16 | Plan structure: index plus one file per phase, two sessions per phase (plan, then implement) | — |
+| 2026-11-16 | Catalog decides what's sellable: handles joined trimmed and lowercased; content-only and discontinued products dropped; content outage degrades to `null` copy, catalog outage or timeout returns 503 | 1 |
+| 2026-11-16 | Pricing in integer cents: `priceCents` is what the shopper pays (valid sale price), `compareAtPriceCents` is the list price when on sale, plus `currency` | 1 |
+| 2026-11-16 | Description HTML sanitized in the BFF (`sanitize-html`, small tag allowlist), not trusted as-is | 1 |
+| 2026-11-16 | BFF↔web contract in a shared types-only package `@saatva/contracts` (`packages/contracts/index.d.ts`) | 1 |
 
 ## Spec coverage
 
