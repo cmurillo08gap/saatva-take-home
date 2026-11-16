@@ -38,6 +38,15 @@ No test runner or linter is configured. Formatting follows `.prettierrc` (no sem
 - Dependency versions are pinned exactly; keep it that way.
 - Work must run from a clean checkout with `npm install && npm run dev`.
 
+## Plan workflow
+
+Work follows the phases in `docs/plan/README.md` (status table, lifecycle, guardrails). Each phase is planned in plan mode, then implemented in a new session in accept-edits mode.
+
+- Never mark a phase `Accepted` or tick Done without the developer's explicit approval in chat for that phase; ask every time.
+- Only implement a phase whose status is `Planned`; otherwise suggest planning it in plan mode first.
+- Don't implement in the session that planned the phase; suggest a new accept-edits session.
+- Stop at `Ready for review` after filling in the phase's Verification log. Record scope changes in the phase file.
+
 ## Testing in the browser
 
 Implementation is done in the Claude Code desktop app, so verify UI changes in its built-in browser pane (the `mcp__Claude_Browser__*` tools).
