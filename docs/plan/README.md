@@ -10,7 +10,7 @@ The phased plan for building the specs in [`../take-home-specs.md`](../take-home
 | [x] | [2. Configurator UI](phase-2-configurator-ui.md) | R2 · C1 C2 | Accepted | 2026-11-16 |
 | [x] | [3. Cart core](phase-3-cart-core.md) | R3 R7 · C3 | Accepted | 2026-11-16 |
 | [x] | [4. Cart view](phase-4-cart-view.md) | R4 R5 R6 · C3 | Accepted | 2026-11-16 |
-| [ ] | [5. Hardening](phase-5-hardening.md) | R1–R7 (quality) | Not started | — |
+| [ ] | [5. Hardening](phase-5-hardening.md) | R1–R7 (quality) | Ready for review | — |
 | [ ] | [6. Docs and submission](phase-6-docs-submission.md) | C3 discussion, submission | Not started | — |
 | [ ] | [7. Extras (optional)](phase-7-extras.md) | O1 | Not started | — |
 
@@ -86,3 +86,7 @@ Rules for Claude in every session:
 | R7 Cart survives a page refresh | 3 |
 | O1 Anything else a real storefront needs | 7 |
 | 2026-11-16 | Cart is a `/cart` page; stepper min 1 / max 10 with a separate Remove; totals computed on the client from BFF prices; no pruning when products fail to load | 4 |
+| 2026-11-16 | Hardening: upstream timeout 2 s + one retry on network/5xx (never on timeout), web fetch timeout 5 s; no BFF cache; delayed skeleton instead; Nest default error body via a global filter; malformed upstream data = failure | 5 |
+| 2026-11-16 | Retired cart items pruned with a one-time notice; button/badge fills darkened to reach AA; product images normalized to 1268×698 with matching framing; CSP / second sanitizer deferred to Phase 6 notes | 5 |
+| 2026-11-16 | Review follow-up: only `active` products sell, duplicate handles keep the first, blank names and non-slug image keys are dropped; pruned notice counts units; shared `usePruneCart` | 5 |
+| 2026-11-16 | Implementation: selected segment also darkened (`#736e67`, was 2.5:1); cart thumbnails use the image ratio at every width; per-item guards for non-object upstream entries | 5 |

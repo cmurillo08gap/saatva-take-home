@@ -80,7 +80,7 @@
       <div class="ctl">
         <label for="latCat">Catalog latency</label><input id="latCat" type="range" min="0" max="10000" step="100" value="150"><output id="latCatO"></output>
         <label for="latCon">Content latency</label><input id="latCon" type="range" min="0" max="10000" step="100" value="150"><output id="latConO"></output>
-        <label for="tmo">BFF timeout</label><input id="tmo" type="range" min="500" max="10000" step="100" value="3000"><output id="tmoO"></output>
+        <label for="tmo">BFF timeout</label><input id="tmo" type="range" min="500" max="10000" step="100" value="2000"><output id="tmoO"></output>
         <div class="chk">
           <label><input type="checkbox" id="failCat"> catalog fails (503)</label>
           <label><input type="checkbox" id="failCon"> content fails (503)</label>
@@ -136,18 +136,20 @@ const DETAILS = {
     <li><code>next.config.mjs</code> <code>rewrites()</code> proxies browser <code>/api/*</code> to the BFF.</li>
     <li><code>lib/api.ts#apiGet</code> calls the BFF directly when running on the server (rewrites only apply to browser requests).</li>
     <li><code>app/page.tsx</code> loads the products server-side with <code>apiGet</code> and renders <code>ProductConfigurator</code>, or a friendly <code>ProductsUnavailable</code> message when the list can't be loaded.</li>
-    <li>The selected mattress lives in the URL (<code>?product=&lt;id&gt;</code>).</li></ul>`,
+    <li>The selected mattress lives in the URL (<code>?product=&lt;id&gt;</code>).</li>
+    <li><code>apiGet</code> gives up after 5 s (longer than the BFF's worst case), so a hung BFF still ends in the friendly message. <code>app/error.tsx</code> and <code>app/not-found.tsx</code> cover unexpected errors and unknown URLs.</li></ul>`,
   bff: `<p><b>NestJS BFF · apps/api</b> (global prefix <code>/api</code>)</p><ul>
     <li><code>HealthController</code>: <code>GET /api/health</code>.</li>
     <li><code>ProductsController</code> → <code>ProductsService.getProducts()</code>: fetches both upstreams in parallel (<code>Promise.allSettled</code>), then merges them.</li>
     <li><code>product.mapper.ts</code>: joins on the trimmed, lowercased handle, drops content-only and discontinued products, reads prices and ratings defensively, sanitizes the description HTML.</li>
-    <li><code>UpstreamClient</code>: each request aborts after <code>UPSTREAM_TIMEOUT_MS</code> (default 3000).</li>
+    <li><code>UpstreamClient</code>: each attempt aborts after <code>UPSTREAM_TIMEOUT_MS</code> (default 2000; worst case with the retry ≈ 4.15 s). Connection errors and 5xx are retried once after 150 ms; a timeout is never retried. A body that isn't JSON or the documented shape counts as a failure.</li>
+    <li>Errors use Nest's built-in body, <code>{ statusCode, message, error }</code>, with no stack traces; unknown routes are 404 JSON.</li>
     <li>Response type <code>ProductsResponse</code> comes from <code>packages/contracts</code> (types only).</li></ul>
     <p>Catalog failure or timeout → <code>503</code>. Content failure → <code>200</code> with the content fields <code>null</code> / <code>[]</code>.</p>`,
   catalog: `<p><b>Catalog upstream</b> · <code>GET /catalog/v1/products</code></p><p>Third-party mock: products and pricing. Don't modify.</p>`,
   ctx: `<p><b>CartProvider · apps/web/components</b> (client, mounted in the root layout)</p><ul>
     <li>An external store over <code>localStorage</code>, read with <code>useSyncExternalStore</code>. The server snapshot is an empty cart, so hydration always matches.</li>
-    <li><code>useCart()</code> exposes <code>cart</code>, <code>count</code>, <code>hydrated</code>, <code>addItem</code>, <code>prune</code>, <code>setQuantity</code>, <code>removeItem</code>. <code>/cart</code> (<code>CartView</code>) joins the cart with <code>/api/products</code> via <code>priceCart()</code> in integer cents; if products fail to load it shows a message and leaves the stored cart alone.</li>
+    <li><code>useCart()</code> exposes <code>cart</code>, <code>count</code>, <code>hydrated</code>, <code>addItem</code>, <code>prune</code> (returns how many lines it dropped and raises a one-time notice under the header), <code>setQuantity</code>, <code>removeItem</code>, <code>notice</code>. <code>/cart</code> (<code>CartView</code>) joins the cart with <code>/api/products</code> via <code>priceCart()</code> in integer cents; if products fail to load it shows a message and leaves the stored cart alone.</li>
     <li><code>addItem</code> → <code>addLine()</code> (pure, in <code>lib/cart.ts</code>) → <code>writeCart()</code> → notify subscribers. <code>HeaderCart</code> and <code>ProductConfigurator</code> re-render from the same snapshot.</li>
     <li>The <code>storage</code> event keeps other tabs in sync. If storage is blocked or full, the cart stays in memory for the session.</li></ul>
     <p>No network calls: the BFF is not involved in the cart.</p>`,
@@ -235,7 +237,8 @@ const $v = (id) => +$('#' + id).value;
 const conds = () => ({ latCat: $v('latCat'), latCon: $v('latCon'), tmo: $v('tmo'), failCat: $('#failCat').checked, failCon: $('#failCon').checked });
 function settle(lat, tmo, fail) {
   if (lat > tmo) return { ok: false, at: tmo, why: 'timed out after ' + tmo + 'ms' };
-  if (fail) return { ok: false, at: Math.min(lat, 20), why: '503 from upstream' };
+  // 5xx is retried once after 150 ms (a timeout is not); a forced failure fails both attempts.
+  if (fail) return { ok: false, at: Math.min(lat, 20) * 2 + 150, why: '503 twice (retried once)' };
   return { ok: true, at: lat };
 }
 const PRODUCTS = [
@@ -394,7 +397,7 @@ CART_SCENARIOS = [
 const fmt = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + ' s' : v + ' ms');
 function syncOut() { $('#latCatO').textContent = fmt($v('latCat')); $('#latConO').textContent = fmt($v('latCon')); $('#tmoO').textContent = fmt($v('tmo')); }
 for (const id of ['latCat', 'latCon', 'tmo']) $('#' + id).oninput = syncOut;
-$('#reset').onclick = () => { $('#latCat').value = $('#latCon').value = 150; $('#tmo').value = 3000; $('#failCat').checked = $('#failCon').checked = false; syncOut(); };
+$('#reset').onclick = () => { $('#latCat').value = $('#latCon').value = 150; $('#tmo').value = 2000; $('#failCat').checked = $('#failCon').checked = false; syncOut(); };
 syncOut();
 
 function run(fn) {

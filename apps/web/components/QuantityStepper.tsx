@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { MAX_QUANTITY_PER_LINE } from '@/lib/cart'
 
 type QuantityStepperProps = {
@@ -12,6 +12,20 @@ type QuantityStepperProps = {
 export function QuantityStepper({ name, quantity, onChange }: QuantityStepperProps) {
   // While the shopper is typing, the raw text is kept here; otherwise the stored quantity shows.
   const [draft, setDraft] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // A quantity change from outside (another tab, a button) replaces any half-typed draft.
+  const [shownQuantity, setShownQuantity] = useState(quantity)
+  if (shownQuantity !== quantity) {
+    setShownQuantity(quantity)
+    setDraft(null)
+  }
+
+  // A button that disables while focused drops focus to <body>; park it on the input instead.
+  function step(next: number) {
+    if (next <= 1 || next >= MAX_QUANTITY_PER_LINE) inputRef.current?.focus()
+    onChange(next)
+  }
 
   function handleInput(text: string) {
     if (/^\d+$/.test(text)) {
@@ -40,11 +54,12 @@ export function QuantityStepper({ name, quantity, onChange }: QuantityStepperPro
         className="stepper__button"
         aria-label={`Decrease quantity of ${name}`}
         disabled={quantity <= 1}
-        onClick={() => onChange(quantity - 1)}
+        onClick={() => step(quantity - 1)}
       >
         <span aria-hidden="true">&minus;</span>
       </button>
       <input
+        ref={inputRef}
         className="stepper__input"
         type="text"
         inputMode="numeric"
@@ -62,7 +77,7 @@ export function QuantityStepper({ name, quantity, onChange }: QuantityStepperPro
         className="stepper__button"
         aria-label={`Increase quantity of ${name}`}
         disabled={quantity >= MAX_QUANTITY_PER_LINE}
-        onClick={() => onChange(quantity + 1)}
+        onClick={() => step(quantity + 1)}
       >
         <span aria-hidden="true">+</span>
       </button>

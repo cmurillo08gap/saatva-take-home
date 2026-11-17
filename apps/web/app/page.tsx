@@ -1,7 +1,7 @@
-import type { Product, ProductsResponse } from '@saatva/contracts'
+import type { Product } from '@saatva/contracts'
 import { ProductConfigurator } from '@/components/ProductConfigurator'
 import { ProductsUnavailable } from '@/components/ProductsUnavailable'
-import { apiGet } from '@/lib/api'
+import { getProducts } from '@/lib/api'
 
 type HomePageProps = {
   searchParams: Promise<{ product?: string | string[] }>
@@ -13,7 +13,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   let products: Product[] = []
   try {
-    products = (await apiGet<ProductsResponse>('/api/products')).products
+    products = await getProducts()
   } catch (error) {
     // Log for operators; shoppers only get the friendly message.
     console.error(error)

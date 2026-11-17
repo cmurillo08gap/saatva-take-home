@@ -3,10 +3,12 @@
   --color-muted: #6b6b6b;
   --color-bg: #ffffff;
   --color-surface: #f6f5f3;
-  --color-accent: #d4aa79;
-  --color-accent-hover: #c49a69;
   --color-brand: #c39a85;
-  --color-selected: #a8a39c;
+  /* Fills that carry white text, darkened from the mock to reach WCAG AA (>= 4.5:1). */
+  --color-button: #8f6a3f; /* 4.9:1 with white (mock #d4aa79 was 2.1:1) */
+  --color-button-hover: #7a5a35; /* 6.3:1 */
+  --color-badge: #8e6553; /* 5.1:1 (mock #c39a85 was 2.5:1) */
+  --color-selected: #736e67; /* 5.1:1 (mock #a8a39c was 2.5:1) */
   --color-border: #dcd9d5;
   --color-star: #d4aa79;
   --container-width: 1110px;
@@ -54,6 +56,10 @@ img {
   border: 0;
 }
 
+main:focus {
+  outline: none;
+}
+
 /* Header */
 
 .site-header {
@@ -85,6 +91,12 @@ img {
 .site-header__cart {
   position: relative;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 44x44 touch target around the 28px icon; the negative margin keeps the icon on the gutter. */
+  min-width: 44px;
+  min-height: 44px;
+  margin-right: -8px;
   color: var(--color-muted);
   text-decoration: none;
 }
@@ -95,6 +107,7 @@ img {
 .cart-line__name:focus-visible,
 .cart-line__remove:focus-visible,
 .cart-summary__continue:focus-visible,
+.cart-notice__dismiss:focus-visible,
 .cart__title:focus-visible {
   outline: 2px solid var(--color-text);
   outline-offset: 2px;
@@ -110,18 +123,55 @@ img {
 
 .site-header__badge {
   position: absolute;
-  top: -6px;
-  right: -8px;
+  top: 2px;
+  right: 0;
   display: grid;
   place-items: center;
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
   border-radius: 9px;
-  background: var(--color-brand);
+  background: var(--color-badge);
   color: #fff;
   font-size: 0.6875rem;
   line-height: 1;
+}
+
+/* One-time cart notice under the header */
+
+.cart-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: var(--container-width);
+  margin: 1rem 1rem 0;
+  padding: 0.25rem 0.25rem 0.25rem 1rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-button);
+}
+
+.cart-notice__text {
+  flex: 1;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.cart-notice__dismiss {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cart-notice__dismiss:hover {
+  color: var(--color-text);
 }
 
 /* Shared controls */
@@ -131,7 +181,7 @@ img {
   width: 100%;
   padding: 0.6rem 1rem;
   border: 0;
-  background: var(--color-accent);
+  background: var(--color-button);
   color: #fff;
   font: inherit;
   font-size: 1.0625rem;
@@ -143,7 +193,7 @@ img {
 }
 
 .button:hover {
-  background: var(--color-accent-hover);
+  background: var(--color-button-hover);
 }
 
 .button:focus-visible,
@@ -442,7 +492,8 @@ img {
   grid-area: media;
   position: relative;
   align-self: start;
-  aspect-ratio: 4 / 3;
+  /* Same ratio as the product images, so nothing is cropped. */
+  aspect-ratio: 634 / 349;
   overflow: hidden;
   background: var(--color-border);
 }
@@ -604,7 +655,18 @@ img {
   padding: 0.6rem 2rem;
 }
 
-/* Loading skeleton */
+/* Loading skeleton. Hidden for the first 300 ms so fast navigations show nothing. */
+
+.skeleton-screen {
+  opacity: 0;
+  animation: skeleton-appear 0.2s ease-out 0.3s forwards;
+}
+
+@keyframes skeleton-appear {
+  to {
+    opacity: 1;
+  }
+}
 
 .skeleton {
   background: var(--color-border);
@@ -656,10 +718,6 @@ img {
     gap: 1.25rem;
   }
 
-  .cart-line__media {
-    aspect-ratio: 634 / 349;
-  }
-
   .cart-line__quantity {
     align-items: center;
   }
@@ -693,9 +751,17 @@ img {
   .site-header__inner {
     padding: 0 1.5rem;
   }
+
+  .cart-notice {
+    margin-inline: 1.5rem;
+  }
 }
 
 @media (min-width: 1024px) {
+  .cart-notice {
+    margin-inline: 1rem;
+  }
+
   .cart {
     padding-inline: 1rem;
   }
@@ -711,6 +777,10 @@ img {
 }
 
 @media (min-width: 1142px) {
+  .cart-notice {
+    margin-inline: auto;
+  }
+
   .configurator,
   .cart,
   .site-header__inner {
@@ -726,5 +796,10 @@ img {
 
   .skeleton {
     animation: none;
+  }
+
+  /* Still delayed, but appears without the fade. */
+  .skeleton-screen {
+    animation-duration: 0s;
   }
 }

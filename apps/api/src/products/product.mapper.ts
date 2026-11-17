@@ -56,21 +56,28 @@ export function resolvePricing(
   return { priceCents: list, compareAtPriceCents: null, saleIgnored: true }
 }
 
-/** Maps a catalog product (plus optional content) to the public contract. Null if the price is unreadable. */
+export type Pricing = NonNullable<ReturnType<typeof resolvePricing>>
+
+/** Image keys become a path segment, so only plain slugs are accepted. */
+const IMAGE_KEY = /^[A-Za-z0-9_-]+$/
+
+/** Maps a catalog product (plus optional content) to the public contract. Null if the name or image key is unusable. */
 export function toProduct(
   catalog: CatalogProduct,
+  pricing: Pricing,
   content: ContentProduct | undefined,
   currency: string,
 ): Product | null {
-  const pricing = resolvePricing(catalog)
-  if (!pricing) return null
+  const name = typeof catalog.displayName === 'string' ? catalog.displayName.trim() : ''
+  const imageKey = typeof catalog.imageKey === 'string' ? catalog.imageKey.trim() : ''
+  if (name === '' || !IMAGE_KEY.test(imageKey)) return null
   return {
     id: normalizeHandle(catalog.productHandle),
-    name: catalog.displayName,
+    name,
     priceCents: pricing.priceCents,
     compareAtPriceCents: pricing.compareAtPriceCents,
     currency,
-    imageUrl: `/images/${catalog.imageKey}.jpg`,
+    imageUrl: `/images/${imageKey}.jpg`,
     headline: typeof content?.headline === 'string' ? content.headline : null,
     descriptionHtml: sanitizeDescription(content?.descriptionHtml),
     rating: parseRating(content?.reviews),

@@ -2,9 +2,9 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Product } from '@saatva/contracts'
-import { useCart } from '@/components/CartProvider'
+import { useCart, usePruneCart } from '@/components/CartProvider'
 import { MAX_QUANTITY_PER_LINE } from '@/lib/cart'
 import { PriceTag } from '@/components/PriceTag'
 import { RichText } from '@/components/RichText'
@@ -21,13 +21,10 @@ export function ProductConfigurator({ products, initialProductId }: ProductConfi
     () => (products.find((p) => p.id === initialProductId) ?? products[0]).id,
   )
   const product = products.find((p) => p.id === selectedId) ?? products[0]
-  const { addItem, prune } = useCart()
+  const { addItem } = useCart()
   const [status, setStatus] = useState('')
 
-  // Drop cart lines for products that are no longer sellable.
-  useEffect(() => {
-    prune(products.map((p) => p.id))
-  }, [products, prune])
+  usePruneCart(products)
 
   function handleAdd() {
     setStatus(

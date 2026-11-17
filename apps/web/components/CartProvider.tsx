@@ -1,6 +1,14 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useSyncExternalStore } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import type { Product } from '@saatva/contracts'
 import {
   CART_STORAGE_KEY,
@@ -69,9 +77,20 @@ type CartContextValue = {
   /** False during server render and hydration; true once the real cart can be shown. */
   hydrated: boolean
   addItem: (product: Pick<Product, 'id'>) => 'added' | 'max'
-  prune: (validIds: readonly string[]) => void
+  /** Drops lines for products no longer sold. Returns how many units (not lines) were removed. */
+  prune: (validIds: readonly string[]) => number
   setQuantity: (productId: string, quantity: number) => void
-  removeItem: (productId: string) => void
+  /** Returns false when the product wasn't in the cart. */
+  removeItem: (productId: string) => boolean
+  /** One-time message for this tab, e.g. after retired products were pruned. */
+  notice: string | null
+  dismissNotice: () => void
+}
+
+export function prunedNotice(removed: number): string {
+  return removed === 1
+    ? '1 item is no longer available and was removed from your cart.'
+    : `${removed} items are no longer available and were removed from your cart.`
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
@@ -91,12 +110,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     return 'added'
   }, [])
 
+  // React state, not storage: only the tab that pruned shows the notice, and only once.
+  const [notice, setNotice] = useState<string | null>(null)
+  const dismissNotice = useCallback(() => setNotice(null), [])
+
   const prune = useCallback((validIds: readonly string[]) => {
     // An empty list means the catalog failed to load, not that every product is gone.
-    if (validIds.length === 0) return
+    if (validIds.length === 0) return 0
     const current = getSnapshot()
     const next = pruneCart(current, validIds)
-    if (next !== current) commit(next)
+    if (next === current) return 0
+    commit(next)
+    // Units, to match the header badge and the summary's "Items" count.
+    const removed = cartCount(current) - cartCount(next)
+    setNotice(prunedNotice(removed))
+    return removed
   }, [])
 
   const setQuantity = useCallback((productId: string, quantity: number) => {
@@ -108,12 +136,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const removeItem = useCallback((productId: string) => {
     const current = getSnapshot()
     const next = removeLine(current, productId)
-    if (next !== current) commit(next)
+    if (next === current) return false
+    commit(next)
+    return true
   }, [])
 
   const value = useMemo(
-    () => ({ cart, count: cartCount(cart), hydrated, addItem, prune, setQuantity, removeItem }),
-    [cart, hydrated, addItem, prune, setQuantity, removeItem],
+    () => ({
+      cart,
+      count: cartCount(cart),
+      hydrated,
+      addItem,
+      prune,
+      setQuantity,
+      removeItem,
+      notice,
+      dismissNotice,
+    }),
+    [cart, hydrated, addItem, prune, setQuantity, removeItem, notice, dismissNotice],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
@@ -123,4 +163,12 @@ export function useCart(): CartContextValue {
   const value = useContext(CartContext)
   if (!value) throw new Error('useCart must be used inside <CartProvider>')
   return value
+}
+
+/** Drops cart lines for products that are no longer sellable, once the product list is known. */
+export function usePruneCart(products: readonly Pick<Product, 'id'>[]) {
+  const { prune } = useCart()
+  useEffect(() => {
+    prune(products.map((p) => p.id))
+  }, [products, prune])
 }

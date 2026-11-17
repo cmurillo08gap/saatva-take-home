@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import type { Product, ProductsResponse } from '@saatva/contracts'
+import type { Product } from '@saatva/contracts'
 import { CartUnavailable } from '@/components/CartUnavailable'
 import { CartView } from '@/components/CartView'
-import { apiGet } from '@/lib/api'
+import { getProducts } from '@/lib/api'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default async function CartPage() {
   let products: Product[] = []
   try {
-    products = (await apiGet<ProductsResponse>('/api/products')).products
+    products = await getProducts()
   } catch (error) {
     console.error(error)
   }

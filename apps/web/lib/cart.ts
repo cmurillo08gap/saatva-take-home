@@ -27,7 +27,9 @@ export function parseCart(raw: string | null): Cart {
     const { productId, quantity } = (line ?? {}) as Partial<CartLine>
     if (typeof productId !== 'string' || productId === '') continue
     if (typeof quantity !== 'number' || !Number.isFinite(quantity)) continue
-    const clamped = Math.min(MAX_QUANTITY_PER_LINE, Math.max(1, Math.floor(quantity)))
+    // Zero or negative means the line was meant to be gone, so drop it rather than revive it as 1.
+    const clamped = Math.min(MAX_QUANTITY_PER_LINE, Math.floor(quantity))
+    if (clamped < 1) continue
     merged.set(productId, Math.min(MAX_QUANTITY_PER_LINE, (merged.get(productId) ?? 0) + clamped))
   }
   if (merged.size === 0) return EMPTY_CART
@@ -62,8 +64,9 @@ export function pruneCart(cart: Cart, validIds: readonly string[]): Cart {
   return lines.length === cart.lines.length ? cart : { lines }
 }
 
-/** Sets a line's quantity (clamped to 1–max). Returns the same reference when nothing changes. */
+/** Sets a line's quantity (clamped to 1–max). Returns the same reference when nothing changes or the quantity isn't a number. */
 export function setLineQuantity(cart: Cart, productId: string, quantity: number): Cart {
+  if (!Number.isFinite(quantity)) return cart
   const clamped = Math.min(MAX_QUANTITY_PER_LINE, Math.max(1, Math.floor(quantity)))
   const existing = cart.lines.find((l) => l.productId === productId)
   if (!existing || existing.quantity === clamped) return cart

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Questrial, Source_Serif_4 } from 'next/font/google'
+import { CartNotice } from '@/components/CartNotice'
 import { CartProvider } from '@/components/CartProvider'
 import { Header } from '@/components/Header'
 import './globals.css'
@@ -17,7 +18,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <CartProvider>
           <Header />
-          <main>{children}</main>
+          <CartNotice />
+          <main id="main" tabIndex={-1}>
+            {children}
+          </main>
         </CartProvider>
       </body>
     </html>
