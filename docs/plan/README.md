@@ -9,7 +9,7 @@ The phased plan for building the specs in [`../take-home-specs.md`](../take-home
 | [x] | [1. Products BFF](phase-1-products-bff.md) | R1 · C1 C2 C4 | Accepted | 2026-11-16 |
 | [x] | [2. Configurator UI](phase-2-configurator-ui.md) | R2 · C1 C2 | Accepted | 2026-11-16 |
 | [x] | [3. Cart core](phase-3-cart-core.md) | R3 R7 · C3 | Accepted | 2026-11-16 |
-| [ ] | [4. Cart view](phase-4-cart-view.md) | R4 R5 R6 · C3 | Not started | — |
+| [x] | [4. Cart view](phase-4-cart-view.md) | R4 R5 R6 · C3 | Accepted | 2026-11-16 |
 | [ ] | [5. Hardening](phase-5-hardening.md) | R1–R7 (quality) | Not started | — |
 | [ ] | [6. Docs and submission](phase-6-docs-submission.md) | C3 discussion, submission | Not started | — |
 | [ ] | [7. Extras (optional)](phase-7-extras.md) | O1 | Not started | — |
@@ -85,3 +85,4 @@ Rules for Claude in every session:
 | R6 Accurate cart total | 4 |
 | R7 Cart survives a page refresh | 3 |
 | O1 Anything else a real storefront needs | 7 |
+| 2026-11-16 | Cart is a `/cart` page; stepper min 1 / max 10 with a separate Remove; totals computed on the client from BFF prices; no pruning when products fail to load | 4 |

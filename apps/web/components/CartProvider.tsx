@@ -9,7 +9,9 @@ import {
   cartCount,
   parseCart,
   pruneCart,
+  removeLine,
   readCart,
+  setLineQuantity,
   writeCart,
   type Cart,
 } from '@/lib/cart'
@@ -68,6 +70,8 @@ type CartContextValue = {
   hydrated: boolean
   addItem: (product: Pick<Product, 'id'>) => 'added' | 'max'
   prune: (validIds: readonly string[]) => void
+  setQuantity: (productId: string, quantity: number) => void
+  removeItem: (productId: string) => void
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
@@ -88,14 +92,28 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const prune = useCallback((validIds: readonly string[]) => {
+    // An empty list means the catalog failed to load, not that every product is gone.
+    if (validIds.length === 0) return
     const current = getSnapshot()
     const next = pruneCart(current, validIds)
     if (next !== current) commit(next)
   }, [])
 
+  const setQuantity = useCallback((productId: string, quantity: number) => {
+    const current = getSnapshot()
+    const next = setLineQuantity(current, productId, quantity)
+    if (next !== current) commit(next)
+  }, [])
+
+  const removeItem = useCallback((productId: string) => {
+    const current = getSnapshot()
+    const next = removeLine(current, productId)
+    if (next !== current) commit(next)
+  }, [])
+
   const value = useMemo(
-    () => ({ cart, count: cartCount(cart), hydrated, addItem, prune }),
-    [cart, hydrated, addItem, prune],
+    () => ({ cart, count: cartCount(cart), hydrated, addItem, prune, setQuantity, removeItem }),
+    [cart, hydrated, addItem, prune, setQuantity, removeItem],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

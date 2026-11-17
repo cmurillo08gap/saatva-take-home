@@ -1,3 +1,5 @@
+import type { Product } from '@saatva/contracts'
+
 // Pure cart logic (no React). A line stores only a product id and a quantity;
 // names, images and prices are always joined from the BFF product list.
 
@@ -58,6 +60,47 @@ export function pruneCart(cart: Cart, validIds: readonly string[]): Cart {
   const valid = new Set(validIds)
   const lines = cart.lines.filter((l) => valid.has(l.productId))
   return lines.length === cart.lines.length ? cart : { lines }
+}
+
+/** Sets a line's quantity (clamped to 1–max). Returns the same reference when nothing changes. */
+export function setLineQuantity(cart: Cart, productId: string, quantity: number): Cart {
+  const clamped = Math.min(MAX_QUANTITY_PER_LINE, Math.max(1, Math.floor(quantity)))
+  const existing = cart.lines.find((l) => l.productId === productId)
+  if (!existing || existing.quantity === clamped) return cart
+  return {
+    lines: cart.lines.map((l) => (l.productId === productId ? { ...l, quantity: clamped } : l)),
+  }
+}
+
+/** Removes a line. Returns the same reference when the product isn't in the cart. */
+export function removeLine(cart: Cart, productId: string): Cart {
+  const lines = cart.lines.filter((l) => l.productId !== productId)
+  return lines.length === cart.lines.length ? cart : { lines }
+}
+
+export type PricedLine = { product: Product; quantity: number; lineTotalCents: number }
+export type PricedCart = {
+  lines: PricedLine[]
+  subtotalCents: number
+  /** Total units across the priced lines. */
+  count: number
+  currency: string
+}
+
+/** Joins the cart with current BFF products. All math is integer cents; unknown ids are skipped. */
+export function priceCart(cart: Cart, products: readonly Product[]): PricedCart {
+  const byId = new Map(products.map((p) => [p.id, p]))
+  const lines: PricedLine[] = []
+  for (const { productId, quantity } of cart.lines) {
+    const product = byId.get(productId)
+    if (product) lines.push({ product, quantity, lineTotalCents: product.priceCents * quantity })
+  }
+  return {
+    lines,
+    subtotalCents: lines.reduce((sum, l) => sum + l.lineTotalCents, 0),
+    count: lines.reduce((sum, l) => sum + l.quantity, 0),
+    currency: products[0]?.currency ?? 'USD',
+  }
 }
 
 export function cartCount(cart: Cart): number {

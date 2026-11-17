@@ -96,7 +96,7 @@
       <h2><span>Scenarios</span>
         <label style="text-transform:none;letter-spacing:0">speed <select id="speed"><option value="0.6">slow</option><option value="1" selected>normal</option><option value="2.5">fast</option></select></label></h2>
       <div class="btns" id="scenarios"></div>
-      <p class="hint">The cart scenarios (Add to cart, Refresh) stay in the browser: there is no cart endpoint, so no request reaches the BFF. They share one simulated cart, capped at 10.</p>
+      <p class="hint">The cart scenarios (Add to cart, Refresh) stay in the browser: there is no cart endpoint, so no request reaches the BFF. View cart is the one exception: <code>/cart</code> fetches <code>/api/products</code> server-side to price the lines, so it honours the latency and failure controls above. All share one simulated cart, capped at 10.</p>
       <p class="hint">Animation time is compressed; the log and timeline show the simulated milliseconds.</p>
     </div>
   </div>
@@ -147,7 +147,7 @@ const DETAILS = {
   catalog: `<p><b>Catalog upstream</b> · <code>GET /catalog/v1/products</code></p><p>Third-party mock: products and pricing. Don't modify.</p>`,
   ctx: `<p><b>CartProvider · apps/web/components</b> (client, mounted in the root layout)</p><ul>
     <li>An external store over <code>localStorage</code>, read with <code>useSyncExternalStore</code>. The server snapshot is an empty cart, so hydration always matches.</li>
-    <li><code>useCart()</code> exposes <code>cart</code>, <code>count</code>, <code>hydrated</code>, <code>addItem</code>, <code>prune</code>.</li>
+    <li><code>useCart()</code> exposes <code>cart</code>, <code>count</code>, <code>hydrated</code>, <code>addItem</code>, <code>prune</code>, <code>setQuantity</code>, <code>removeItem</code>. <code>/cart</code> (<code>CartView</code>) joins the cart with <code>/api/products</code> via <code>priceCart()</code> in integer cents; if products fail to load it shows a message and leaves the stored cart alone.</li>
     <li><code>addItem</code> → <code>addLine()</code> (pure, in <code>lib/cart.ts</code>) → <code>writeCart()</code> → notify subscribers. <code>HeaderCart</code> and <code>ProductConfigurator</code> re-render from the same snapshot.</li>
     <li>The <code>storage</code> event keeps other tabs in sync. If storage is blocked or full, the cart stays in memory for the session.</li></ul>
     <p>No network calls: the BFF is not involved in the cart.</p>`,
@@ -364,6 +364,29 @@ CART_SCENARIOS = [
     await hop('ls', 'ctx', cartQty ? 'stored cart' : 'null', { kind: 'res', ms: 1, body: cartJson(cartQty) });
     await hop('ctx', 'ctx', 'parseCart + prune', { kind: 'work', ms: 1, note: 'Bad JSON → empty; invalid lines dropped; qty clamped 1–' + CART_MAX + '; unknown ids pruned once /api/products ids are known' });
     await hop('ctx', 'browser', 'HeaderCart re-renders', { kind: 'res', ms: 2, note: 'hydrated = true → ' + badge(cartQty), body: { count: cartQty, hydrated: true } });
+  } },
+  { id: 'viewcart', label: 'View cart (GET /cart)', run: async () => {
+    header('Open /cart from the header link with ' + cartQty + ' in the cart');
+    await hop('browser', 'web', 'GET /cart', { note: 'Header link → app/cart/page.tsx (dynamic server component)' });
+    await hop('web', 'bff', 'GET /api/products (direct)', { note: 'Same apiGet() as the home page: the cart never stores names or prices' });
+    const r = await productsFlow('web');
+    await hop('bff', 'web', String(r.status), { kind: r.kind, ms: r.total, body: r.body });
+    if (r.status !== 200) {
+      await hop('web', 'web', 'render CartUnavailable', { kind: 'err', note: 'Cart-specific message; CartView is not rendered, so nothing is pruned' });
+      await hop('web', 'browser', '200 HTML', { kind: 'res', body: '<section class="unavailable">We can\u2019t show your cart right now \u2026 Your items are still saved.</section>' });
+      await hop('browser', 'ls', 'localStorage untouched', { kind: 'work', ms: 1, note: 'Stored cart is unchanged: ' + (cartQty ? cartQty + ' \u00d7 Saatva Classic' : 'empty') });
+      return;
+    }
+    await hop('web', 'web', 'render CartView', { kind: 'work', note: 'Products passed as props; server snapshot is an empty cart' });
+    await hop('web', 'browser', '200 HTML', { kind: 'res', body: '<div class="cart" aria-busy="true">skeleton</div>', note: 'Skeleton, not the empty state, so a full cart never flashes "empty"' });
+    await hop('browser', 'ctx', 'hydrate', { note: 'CartProvider mounts; hydrated becomes true' });
+    await hop('ctx', 'ls', 'getItem(saatva.cart.v1)', { ms: 1 });
+    await hop('ls', 'ctx', cartQty ? 'stored cart' : 'null', { kind: 'res', ms: 1, body: cartJson(cartQty) });
+    await hop('ctx', 'ctx', 'prune(product ids)', { kind: 'work', ms: 1, note: 'Lines whose product is gone are dropped; an empty id list is ignored' });
+    const lineTotal = 99900 * cartQty;
+    await hop('ctx', 'browser', cartQty ? 'CartView renders lines' : 'CartView renders empty state', { kind: 'res', ms: 2,
+      note: cartQty ? 'priceCart(): ' + cartQty + ' \u00d7 $999 = $' + (lineTotal / 100).toLocaleString('en-US') + '. Subtotal in integer cents, formatted with formatPrice' : 'No lines: "Your cart is empty" with a Continue shopping link',
+      body: cartQty ? { lines: [{ product: 'saatva-classic', quantity: cartQty, lineTotalCents: lineTotal }], subtotalCents: lineTotal, count: cartQty, currency: 'USD' } : { lines: [], subtotalCents: 0, count: 0 } });
   } },
   { id: 'emptycart', label: 'Clear cart (reset demo)', run: async () => { cartQty = 0; renderCart(); header('Demo cart reset to empty'); } },
 ];

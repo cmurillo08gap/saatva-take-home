@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCart } from '@/components/CartProvider'
 
 export function HeaderCart() {
@@ -8,9 +9,9 @@ export function HeaderCart() {
   const shown = hydrated ? count : 0
 
   return (
-    <span
+    <Link
       className="site-header__cart"
-      role="img"
+      href="/cart"
       aria-label={`Cart, ${shown} ${shown === 1 ? 'item' : 'items'}`}
     >
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -29,6 +30,6 @@ export function HeaderCart() {
           {shown}
         </span>
       )}
-    </span>
+    </Link>
   )
 }

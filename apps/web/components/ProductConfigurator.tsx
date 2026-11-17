@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import type { Product } from '@saatva/contracts'
 import { useCart } from '@/components/CartProvider'
@@ -114,6 +115,14 @@ export function ProductConfigurator({ products, initialProductId }: ProductConfi
         </button>
         <p className="configurator__status" role="status" aria-live="polite">
           {status}
+          {status.startsWith('Added') && (
+            <>
+              {' '}
+              <Link className="configurator__cart-link" href="/cart">
+                View cart
+              </Link>
+            </>
+          )}
         </p>
       </div>
     </section>
