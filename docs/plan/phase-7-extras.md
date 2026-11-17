@@ -1,6 +1,8 @@
 # Phase 7: Extras (optional)
 
-**Status:** Not started · **Specs:** O1 · **Depends on:** Phase 5
+**Status:** Skipped · **Specs:** O1 · **Depends on:** Phase 5
+
+> **Skipped (2026-11-16).** We stopped at the required scope (R1–R7) plus the Phase 5 hardening. The candidates below become "with more time" talking points in `NOTES.md` (Phase 6).
 
 ## Goal
 

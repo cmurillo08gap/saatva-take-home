@@ -131,17 +131,18 @@ const NODES = {
 };
 const EDGES = [['browser','web'],['web','bff'],['bff','catalog'],['bff','content'],['browser','ctx'],['ctx','ls']];
 const DETAILS = {
-  browser: `<p><b>Browser.</b> Only talks to the Next.js app. Client-side requests use relative <code>/api/...</code> URLs.</p>`,
+  browser: `<p><b>Browser.</b> Only talks to the Next.js app. Pages load their data server-side, so today no client code calls <code>/api/...</code>; the rewrite is there for client fetches and for opening BFF routes such as <code>/api/health</code> from the browser.</p>`,
   web: `<p><b>Next.js · apps/web</b></p><ul>
     <li><code>next.config.mjs</code> <code>rewrites()</code> proxies browser <code>/api/*</code> to the BFF.</li>
     <li><code>lib/api.ts#apiGet</code> calls the BFF directly when running on the server (rewrites only apply to browser requests).</li>
-    <li><code>app/page.tsx</code> loads the products server-side with <code>apiGet</code> and renders <code>ProductConfigurator</code>, or a friendly <code>ProductsUnavailable</code> message when the list can't be loaded.</li>
+    <li><code>app/page.tsx</code> and <code>app/cart/page.tsx</code> load the products server-side with <code>getProducts()</code> (a wrapper over <code>apiGet</code> that checks for a <code>products</code> array); the home page renders <code>ProductConfigurator</code>, or a friendly <code>ProductsUnavailable</code> message when the list can't be loaded.</li>
     <li>The selected mattress lives in the URL (<code>?product=&lt;id&gt;</code>).</li>
     <li><code>apiGet</code> gives up after 5 s (longer than the BFF's worst case), so a hung BFF still ends in the friendly message. <code>app/error.tsx</code> and <code>app/not-found.tsx</code> cover unexpected errors and unknown URLs.</li></ul>`,
   bff: `<p><b>NestJS BFF · apps/api</b> (global prefix <code>/api</code>)</p><ul>
     <li><code>HealthController</code>: <code>GET /api/health</code>.</li>
     <li><code>ProductsController</code> → <code>ProductsService.getProducts()</code>: fetches both upstreams in parallel (<code>Promise.allSettled</code>), then merges them.</li>
-    <li><code>product.mapper.ts</code>: joins on the trimmed, lowercased handle, drops content-only and discontinued products, reads prices and ratings defensively, sanitizes the description HTML.</li>
+    <li><code>ProductsService</code> joins on the trimmed, lowercased handle and lets the catalog decide what sells: only status <code>active</code>, first of any duplicate handle; content-only products are dropped.</li>
+    <li><code>product.mapper.ts</code> (pure functions): reads prices and ratings defensively, drops blank names and non-slug image keys, sanitizes the description HTML.</li>
     <li><code>UpstreamClient</code>: each attempt aborts after <code>UPSTREAM_TIMEOUT_MS</code> (default 2000; worst case with the retry ≈ 4.15 s). Connection errors and 5xx are retried once after 150 ms; a timeout is never retried. A body that isn't JSON or the documented shape counts as a failure.</li>
     <li>Errors use Nest's built-in body, <code>{ statusCode, message, error }</code>, with no stack traces; unknown routes are 404 JSON.</li>
     <li>Response type <code>ProductsResponse</code> comes from <code>packages/contracts</code> (types only).</li></ul>
@@ -149,7 +150,7 @@ const DETAILS = {
   catalog: `<p><b>Catalog upstream</b> · <code>GET /catalog/v1/products</code></p><p>Third-party mock: products and pricing. Don't modify.</p>`,
   ctx: `<p><b>CartProvider · apps/web/components</b> (client, mounted in the root layout)</p><ul>
     <li>An external store over <code>localStorage</code>, read with <code>useSyncExternalStore</code>. The server snapshot is an empty cart, so hydration always matches.</li>
-    <li><code>useCart()</code> exposes <code>cart</code>, <code>count</code>, <code>hydrated</code>, <code>addItem</code>, <code>prune</code> (returns how many lines it dropped and raises a one-time notice under the header), <code>setQuantity</code>, <code>removeItem</code>, <code>notice</code>. <code>/cart</code> (<code>CartView</code>) joins the cart with <code>/api/products</code> via <code>priceCart()</code> in integer cents; if products fail to load it shows a message and leaves the stored cart alone.</li>
+    <li><code>useCart()</code> exposes <code>cart</code>, <code>count</code>, <code>hydrated</code>, <code>addItem</code>, <code>prune</code> (returns how many units it removed and raises a one-time notice under the header), <code>setQuantity</code>, <code>removeItem</code>, <code>notice</code>. <code>/cart</code> (<code>CartView</code>) joins the cart with <code>/api/products</code> via <code>priceCart()</code> in integer cents; if products fail to load it shows a message and leaves the stored cart alone.</li>
     <li><code>addItem</code> → <code>addLine()</code> (pure, in <code>lib/cart.ts</code>) → <code>writeCart()</code> → notify subscribers. <code>HeaderCart</code> and <code>ProductConfigurator</code> re-render from the same snapshot.</li>
     <li>The <code>storage</code> event keeps other tabs in sync. If storage is blocked or full, the cart stays in memory for the session.</li></ul>
     <p>No network calls: the BFF is not involved in the cart.</p>`,
@@ -298,7 +299,7 @@ const SCENARIOS = [
   { id: 'page', label: 'Load page (GET /)', primary: true, run: async () => {
     header('Browser loads the page');
     await hop('browser', 'web', 'GET /');
-    await hop('web', 'bff', 'GET /api/products (direct)', { note: 'app/page.tsx awaits lib/api.ts#apiGet on the server' });
+    await hop('web', 'bff', 'GET /api/products (direct)', { note: 'app/page.tsx awaits lib/api.ts#getProducts (apiGet) on the server' });
     const r = await productsFlow('web');
     await hop('bff', 'web', String(r.status), { kind: r.kind, ms: r.total, body: r.body });
     const ok = r.status === 200;
@@ -314,7 +315,7 @@ const SCENARIOS = [
     await hop('web', 'browser', '200', { kind: 'res', body: { status: 'ok' } });
   } },
   { id: 'client', label: 'Browser: GET /api/products', run: async () => {
-    header('Client-side fetch through the rewrite');
+    header('Client-side fetch through the rewrite (no page does this today; e.g. devtools)');
     await hop('browser', 'web', 'GET /api/products');
     await hop('web', 'bff', 'rewrite → :4000');
     const r = await productsFlow('web');
@@ -323,7 +324,7 @@ const SCENARIOS = [
   } },
   { id: 'server', label: 'Server-side apiGet()', run: async () => {
     header('Server component calls the BFF directly');
-    await hop('web', 'bff', 'GET /api/products (direct)', { note: 'lib/api.ts#apiGet on the server uses API_URL, not the rewrite' });
+    await hop('web', 'bff', 'GET /api/products (direct)', { note: 'getProducts() → apiGet on the server uses API_URL, not the rewrite' });
     const r = await productsFlow('web');
     await hop('bff', 'web', String(r.status), { kind: r.kind, ms: r.total, body: r.body });
   } },
@@ -371,7 +372,7 @@ CART_SCENARIOS = [
   { id: 'viewcart', label: 'View cart (GET /cart)', run: async () => {
     header('Open /cart from the header link with ' + cartQty + ' in the cart');
     await hop('browser', 'web', 'GET /cart', { note: 'Header link → app/cart/page.tsx (dynamic server component)' });
-    await hop('web', 'bff', 'GET /api/products (direct)', { note: 'Same apiGet() as the home page: the cart never stores names or prices' });
+    await hop('web', 'bff', 'GET /api/products (direct)', { note: 'Same getProducts() as the home page: the cart never stores names or prices' });
     const r = await productsFlow('web');
     await hop('bff', 'web', String(r.status), { kind: r.kind, ms: r.total, body: r.body });
     if (r.status !== 200) {

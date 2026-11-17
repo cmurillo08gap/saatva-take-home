@@ -1,6 +1,6 @@
 # Phase 5: Hardening
 
-**Status:** Ready for review · **Specs:** quality pass over R1–R7 · **Depends on:** Phase 4
+**Status:** Accepted · **Specs:** quality pass over R1–R7 · **Depends on:** Phase 4
 
 ## Goal
 
@@ -216,3 +216,5 @@ Two `/code-review` passes over the whole application after Phase 5 (path targets
 | Low | 5 minor style and micro-optimization suggestions | Not worth the extra code (over-long lines were reformatted) |
 
 _Developer review notes go below._
+
+Accepted 2026-11-16 (approved in chat while planning Phase 6).

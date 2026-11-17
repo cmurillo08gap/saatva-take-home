@@ -35,9 +35,9 @@ flowchart LR
   CRSC -->|"products"| CV
   CV -->|"setQuantity, removeItem, prune"| CP
   HC -.->|"link to /cart"| CRSC
-  B -->|"fetch('/api/…')"| RW --> PC
-  RSC -->|"apiGet(), server-side"| PC
-  CRSC -->|"apiGet(), server-side"| PC
+  B -.->|"/api/* (no client fetch today)"| RW --> PC
+  RSC -->|"getProducts() → apiGet(), server-side"| PC
+  CRSC -->|"getProducts() → apiGet(), server-side"| PC
   PC --> PS --> UC
   PS --> PM
   UC --> CAT
@@ -79,7 +79,7 @@ flowchart LR
 
 ## Configurator page
 
-`app/page.tsx` is an async server component. It reads `?product=`, loads the list with `apiGet<ProductsResponse>('/api/products')` and renders the client component `ProductConfigurator`. The browser never calls the BFF for this page.
+`app/page.tsx` is an async server component. It reads `?product=`, loads the list with `getProducts()` (`lib/api.ts`, a thin wrapper over `apiGet` that checks for a `products` array) and renders the client component `ProductConfigurator`. The browser never calls the BFF for this page.
 
 - **Selection** is a native radio group styled as a segmented control. The chosen id is state in the component and is mirrored to the URL with `history.replaceState` (no server round trip, no history entry per click). A missing or unknown `?product=` falls back to the first product, so links are shareable and a refresh keeps the choice.
 - **Content fields** (`headline`, `rating`, `descriptionHtml`, `badges`) are hidden when `null` / empty, so the page still works when the BFF returns the degraded `200`.
@@ -107,8 +107,10 @@ The cart lives in the browser's `localStorage` (key `saatva.cart.v1`); there is 
 
 - `packages/contracts/index.d.ts`: shared response types, imported with `import type`.
 - `apps/web/app/`: `page.tsx` (data), `loading.tsx`, `error.tsx`, `not-found.tsx`, `cart/` (`page.tsx`, `loading.tsx`), `globals.css` (tokens and all styles).
-- `apps/web/components/`: `ProductConfigurator`, `PriceTag`, `StarRating`, `RichText`, `ProductsUnavailable`, `Header`, `HeaderCart`, `CartProvider`, `CartView`, `CartNotice`, `QuantityStepper`, `CartUnavailable`; `apps/web/lib/`: `api.ts`, `format.ts`, `cart.ts`.
-- `apps/api/src/products/`: controller, service, `product.mapper.ts` (pure mapping functions).
+- `apps/web/components/`: `ProductConfigurator`, `PriceTag`, `StarRating`, `RichText`, `ProductsUnavailable`, `Header`, `HeaderCart`, `CartProvider`, `CartView`, `CartNotice`, `QuantityStepper`, `CartUnavailable`; `apps/web/lib/`: `api.ts` (`apiGet`, `getProducts`), `format.ts`, `cart.ts`.
+- `apps/web/next.config.mjs`: the `/api/*` rewrite to the BFF. Today every page loads its data server-side, so no client code goes through it; it is there for client fetches and for hitting the BFF from the browser (e.g. `/api/health`).
+- `apps/api/src/main.ts` (global prefix `/api`, `API_PORT`), `app.module.ts`, `health.controller.ts` (`GET /api/health` → `{ status: 'ok' }`).
+- `apps/api/src/products/`: controller, service (fetch both upstreams, join, decide what sells), `product.mapper.ts` (pure functions: handle normalizing, pricing, ratings, sanitized description).
 - `apps/api/src/upstream/`: client (timeout, one retry, shape check) and provider types.
 
 ## Configuration

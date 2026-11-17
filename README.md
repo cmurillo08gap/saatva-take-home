@@ -1,5 +1,7 @@
 # Saatva Storefront Exercise
 
+Submission notes: see [`NOTES.md`](NOTES.md).
+
 Thanks for spending time with us! This exercise is a small slice of how our storefront works: a Next.js frontend, a NestJS BFF (backend-for-frontend), and third-party "upstream" services it pulls data from.
 
 Part of the app is already wired up. Your job is to build the rest.
