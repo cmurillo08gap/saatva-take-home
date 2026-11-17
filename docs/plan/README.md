@@ -7,7 +7,7 @@ The phased plan for building the specs in [`../take-home-specs.md`](../take-home
 | Done | Phase | Specs | Status | Reviewed |
 | --- | --- | --- | --- | --- |
 | [x] | [1. Products BFF](phase-1-products-bff.md) | R1 · C1 C2 C4 | Accepted | 2026-11-16 |
-| [ ] | [2. Configurator UI](phase-2-configurator-ui.md) | R2 · C1 C2 | Not started | — |
+| [ ] | [2. Configurator UI](phase-2-configurator-ui.md) | R2 · C1 C2 | Ready for review | — |
 | [ ] | [3. Cart core](phase-3-cart-core.md) | R3 R7 · C3 | Not started | — |
 | [ ] | [4. Cart view](phase-4-cart-view.md) | R4 R5 R6 · C3 | Not started | — |
 | [ ] | [5. Hardening](phase-5-hardening.md) | R1–R7 (quality) | Not started | — |
@@ -62,6 +62,11 @@ Rules for Claude in every session:
 | 2026-11-16 | Pricing in integer cents: `priceCents` is what the shopper pays (valid sale price), `compareAtPriceCents` is the list price when on sale, plus `currency` | 1 |
 | 2026-11-16 | Description HTML sanitized in the BFF (`sanitize-html`, small tag allowlist), not trusted as-is | 1 |
 | 2026-11-16 | BFF↔web contract in a shared types-only package `@saatva/contracts` (`packages/contracts/index.d.ts`) | 1 |
+| 2026-11-16 | Configurator: native radio group styled as the mock's segmented control; selected mattress in `?product=` (server reads it, client uses `replaceState`); stacked layout below 768px | 2 |
+| 2026-11-16 | Web formats prices with `Intl.NumberFormat` (sale price plus struck list price) | 2 |
+| 2026-11-16 | Description: BFF-sanitized HTML rendered with `dangerouslySetInnerHTML` only inside one `RichText` component (React docs guidance); `html-react-parser` rejected (not a sanitizer); structured content from the BFF noted for Phase 6 | 2 |
+| 2026-11-16 | Products unavailable: `page.tsx` catches the error and shows a friendly message; `loading.tsx` skeleton while waiting | 2 |
+| 2026-11-16 | Header restyled to the mock in Phase 2 (count static until Phase 3); Next.js bumped to a patched 16.x to clear the build advisory failure | 2 |
 
 ## Spec coverage
 

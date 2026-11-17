@@ -11,6 +11,7 @@ The repo is ready to send: it runs from a clean checkout, and the docs explain w
 - Final pass on `docs/architecture.md` (the living doc that extends the frozen `docs/base-architecture.md`, updated in each phase), with an updated diagram.
 - Trade-offs and decisions, pulled from the decision log.
 - "With more time / a real data store" notes for the pairing session (C3).
+- "With more time" note (from Phase 2): the BFF could send the description as structured content (paragraphs, list items) instead of HTML, so no raw HTML reaches web and the contract doesn't carry the content provider's format.
 - Update `CLAUDE.md` and README pointers where needed.
 - Clean checkout check: fresh clone, `npm install && npm run dev`, full flow works.
 - Submission format (public repo or zip with `.git`, without `node_modules`).

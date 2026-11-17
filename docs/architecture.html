@@ -127,7 +127,8 @@ const DETAILS = {
   web: `<p><b>Next.js · apps/web</b></p><ul>
     <li><code>next.config.mjs</code> <code>rewrites()</code> proxies browser <code>/api/*</code> to the BFF.</li>
     <li><code>lib/api.ts#apiGet</code> calls the BFF directly when running on the server (rewrites only apply to browser requests).</li>
-    <li><code>app/page.tsx</code>, <code>components/Header.tsx</code>, <code>components/ProductConfigurator.tsx</code> still contain the starting TODOs; the configurator doesn't consume the products endpoint yet.</li></ul>`,
+    <li><code>app/page.tsx</code> loads the products server-side with <code>apiGet</code> and renders <code>ProductConfigurator</code>, or a friendly <code>ProductsUnavailable</code> message when the list can't be loaded.</li>
+    <li>The selected mattress lives in the URL (<code>?product=&lt;id&gt;</code>).</li></ul>`,
   bff: `<p><b>NestJS BFF · apps/api</b> (global prefix <code>/api</code>)</p><ul>
     <li><code>HealthController</code>: <code>GET /api/health</code>.</li>
     <li><code>ProductsController</code> → <code>ProductsService.getProducts()</code>: fetches both upstreams in parallel (<code>Promise.allSettled</code>), then merges them.</li>
@@ -277,8 +278,12 @@ const SCENARIOS = [
   { id: 'page', label: 'Load page (GET /)', primary: true, run: async () => {
     header('Browser loads the page');
     await hop('browser', 'web', 'GET /');
-    await hop('web', 'web', 'render page.tsx', { kind: 'work', note: 'app/page.tsx renders <ProductConfigurator/>; it does not consume /api/products yet' });
-    await hop('web', 'browser', '200 HTML', { kind: 'res', body: '<section><h1>Choose Your Mattress</h1></section>' });
+    await hop('web', 'bff', 'GET /api/products (direct)', { note: 'app/page.tsx awaits lib/api.ts#apiGet on the server' });
+    const r = await productsFlow('web');
+    await hop('bff', 'web', String(r.status), { kind: r.kind, ms: r.total, body: r.body });
+    const ok = r.status === 200;
+    await hop('web', 'web', ok ? 'render ProductConfigurator' : 'render ProductsUnavailable', { kind: 'work', note: ok ? 'null content fields are simply hidden' : 'no status codes or upstream names reach the shopper' });
+    await hop('web', 'browser', '200 HTML', { kind: 'res', body: ok ? '<section class="configurator">…</section>' : '<section class="unavailable">Try again</section>' });
   } },
   { id: 'health', label: 'Health check', run: async () => {
     header('GET /api/health from the browser');

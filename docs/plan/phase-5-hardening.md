@@ -14,6 +14,7 @@ The app behaves well when things go wrong and holds up on accessibility and resp
 - Accessibility pass: keyboard navigation, focus states, labels, live region for the cart count, contrast.
 - Responsive pass: mobile, tablet, desktop.
 - BFF input validation and consistent error responses.
+- Candidate (from Phase 2): defense in depth for the description HTML, either a second sanitizer in web or a Content Security Policy with Trusted Types. Today the BFF sanitizer is the only guard before `RichText`.
 
 ### Out of scope
 
