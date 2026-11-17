@@ -1,8 +1,10 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Product } from '@saatva/contracts'
+import { useCart } from '@/components/CartProvider'
+import { MAX_QUANTITY_PER_LINE } from '@/lib/cart'
 import { PriceTag } from '@/components/PriceTag'
 import { RichText } from '@/components/RichText'
 import { StarRating } from '@/components/StarRating'
@@ -18,9 +20,25 @@ export function ProductConfigurator({ products, initialProductId }: ProductConfi
     () => (products.find((p) => p.id === initialProductId) ?? products[0]).id,
   )
   const product = products.find((p) => p.id === selectedId) ?? products[0]
+  const { addItem, prune } = useCart()
+  const [status, setStatus] = useState('')
+
+  // Drop cart lines for products that are no longer sellable.
+  useEffect(() => {
+    prune(products.map((p) => p.id))
+  }, [products, prune])
+
+  function handleAdd() {
+    setStatus(
+      addItem(product) === 'added'
+        ? `Added ${product.name} to your cart`
+        : `You can add up to ${MAX_QUANTITY_PER_LINE} of this mattress`,
+    )
+  }
 
   function select(id: string) {
     setSelectedId(id)
+    setStatus('')
     // Keep the choice in the URL without a server round trip or a history entry.
     const params = new URLSearchParams(window.location.search)
     params.set('product', id)
@@ -91,10 +109,12 @@ export function ProductConfigurator({ products, initialProductId }: ProductConfi
           <RichText html={product.descriptionHtml} className="configurator__description" />
         )}
 
-        {/* Inert until the cart is wired up. */}
-        <button type="button" className="button configurator__add">
+        <button type="button" className="button configurator__add" onClick={handleAdd}>
           Add to Cart
         </button>
+        <p className="configurator__status" role="status" aria-live="polite">
+          {status}
+        </p>
       </div>
     </section>
   )

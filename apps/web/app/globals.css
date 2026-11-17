@@ -218,6 +218,13 @@ img {
   margin-top: 1rem;
 }
 
+.configurator__status {
+  min-height: 1.5em;
+  margin: 0.75rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.9375rem;
+}
+
 /* Segmented control (native radio group) */
 
 .segmented {

@@ -67,7 +67,7 @@
   <div class="col">
     <div class="card">
       <h2><span>Request flow</span><span id="runstate" style="text-transform:none;letter-spacing:0">idle</span></h2>
-      <svg id="diagram" viewBox="0 0 900 380" role="img" aria-label="Architecture diagram"></svg>
+      <svg id="diagram" viewBox="0 0 900 385" role="img" aria-label="Architecture diagram"></svg>
       <div class="legend">
         <span><i style="background:var(--req)"></i>request</span>
         <span><i style="background:var(--res)"></i>success</span>
@@ -96,10 +96,16 @@
       <h2><span>Scenarios</span>
         <label style="text-transform:none;letter-spacing:0">speed <select id="speed"><option value="0.6">slow</option><option value="1" selected>normal</option><option value="2.5">fast</option></select></label></h2>
       <div class="btns" id="scenarios"></div>
+      <p class="hint">The cart scenarios (Add to cart, Refresh) stay in the browser: there is no cart endpoint, so no request reaches the BFF. They share one simulated cart, capped at 10.</p>
       <p class="hint">Animation time is compressed; the log and timeline show the simulated milliseconds.</p>
     </div>
   </div>
   <div class="col">
+    <div class="card">
+      <h2><span>localStorage</span><span style="text-transform:none;letter-spacing:0"><code>saatva.cart.v1</code></span></h2>
+      <pre id="cartstate"></pre>
+      <div id="cartlines" class="hint"></div>
+    </div>
     <div class="card"><h2>Selected component</h2><div id="details"></div></div>
     <div class="card">
       <h2><span>Event log</span><button class="act" id="clear" style="padding:2px 8px">clear</button></h2>
@@ -120,8 +126,10 @@ const NODES = {
   bff:     { x:470, y:140, w:150, h:90, title:'NestJS BFF',  sub:'apps/api :4000 /api' },
   catalog: { x:725, y:30,  w:155, h:85, title:'Catalog',     sub:'upstream :4100' },
   content: { x:725, y:265, w:155, h:85, title:'Content',     sub:'upstream :4100' },
+  ctx:     { x:235, y:275, w:150, h:80, title:'CartProvider', sub:'React context · client' },
+  ls:      { x:20,  y:275, w:150, h:80, title:'localStorage', sub:'saatva.cart.v1' },
 };
-const EDGES = [['browser','web'],['web','bff'],['bff','catalog'],['bff','content']];
+const EDGES = [['browser','web'],['web','bff'],['bff','catalog'],['bff','content'],['browser','ctx'],['ctx','ls']];
 const DETAILS = {
   browser: `<p><b>Browser.</b> Only talks to the Next.js app. Client-side requests use relative <code>/api/...</code> URLs.</p>`,
   web: `<p><b>Next.js · apps/web</b></p><ul>
@@ -137,8 +145,16 @@ const DETAILS = {
     <li>Response type <code>ProductsResponse</code> comes from <code>packages/contracts</code> (types only).</li></ul>
     <p>Catalog failure or timeout → <code>503</code>. Content failure → <code>200</code> with the content fields <code>null</code> / <code>[]</code>.</p>`,
   catalog: `<p><b>Catalog upstream</b> · <code>GET /catalog/v1/products</code></p><p>Third-party mock: products and pricing. Don't modify.</p>`,
+  ctx: `<p><b>CartProvider · apps/web/components</b> (client, mounted in the root layout)</p><ul>
+    <li>An external store over <code>localStorage</code>, read with <code>useSyncExternalStore</code>. The server snapshot is an empty cart, so hydration always matches.</li>
+    <li><code>useCart()</code> exposes <code>cart</code>, <code>count</code>, <code>hydrated</code>, <code>addItem</code>, <code>prune</code>.</li>
+    <li><code>addItem</code> → <code>addLine()</code> (pure, in <code>lib/cart.ts</code>) → <code>writeCart()</code> → notify subscribers. <code>HeaderCart</code> and <code>ProductConfigurator</code> re-render from the same snapshot.</li>
+    <li>The <code>storage</code> event keeps other tabs in sync. If storage is blocked or full, the cart stays in memory for the session.</li></ul>
+    <p>No network calls: the BFF is not involved in the cart.</p>`,
+  ls: `<p><b>localStorage</b> · key <code>saatva.cart.v1</code></p><p>Holds <code>{"lines":[{"productId","quantity"}]}</code> only. Names, images and prices are joined from <code>/api/products</code> when shown, so a hand-edited value can never change a price. Corrupt JSON or bad lines are dropped on read; max 10 per line.</p>`,
   content: `<p><b>Content upstream</b> · <code>GET /content/v1/products</code></p><p>Third-party mock: marketing copy and reviews. Don't modify.</p>`,
 };
+var CART_SCENARIOS;
 let speed = 1, busy = 0, queue = Promise.resolve(), selected = 'bff';
 
 const $ = (s) => document.querySelector(s);
@@ -163,6 +179,7 @@ function build() {
   const svg = $('#diagram');
   for (const [a, b] of EDGES) { const A = center(a), B = center(b); svg.append(el('line', { class:'edge', x1:A.x, y1:A.y, x2:B.x, y2:B.y })); }
   svg.append(el('text', { x:428, y:128, 'font-size':10, fill:'var(--muted)', 'text-anchor':'middle' }, 'server-side direct'));
+  svg.append(el('text', { x:210, y:370, 'font-size':10, fill:'var(--muted)', 'text-anchor':'middle' }, 'cart: client only, no network'));
   svg.append(el('text', { x:428, y:246, 'font-size':10, fill:'var(--muted)', 'text-anchor':'middle' }, 'browser /api/* via rewrite'));
   for (const id in NODES) {
     const o = NODES[id], g = el('g', { class:'node', id:'n-' + id, tabindex:0, role:'button', 'aria-label':o.title });
@@ -309,6 +326,48 @@ const SCENARIOS = [
   } },
 ];
 
+/* Cart simulation (all client-side; the BFF is never called). */
+let cartQty = 0;
+const CART_MAX = 10;
+const cartJson = (q) => ({ lines: q ? [{ productId: 'saatva-classic', quantity: q }] : [] });
+const CART_NAMES = { 'saatva-classic': 'Saatva Classic' };
+function renderCart() {
+  $('#cartstate').textContent = cartQty ? JSON.stringify(cartJson(cartQty), null, 2) : 'null  (key not set)';
+  $('#cartlines').innerHTML = cartQty
+    ? 'Stored: <b>' + cartQty + ' × ' + CART_NAMES['saatva-classic'] + '</b> (<code>saatva-classic</code>). The name and price are not stored; they come from <code>/api/products</code>. Header count = ' + cartQty + '.'
+    : 'Empty cart. Header shows no badge.';
+}
+const badge = (q) => (q ? 'badge ' + q : 'no badge');
+CART_SCENARIOS = [
+  { id: 'add', label: 'Add to cart', primary: true, run: async () => {
+    header('Click "Add to Cart" (Saatva Classic)');
+    await hop('browser', 'ctx', 'addItem(product)', { note: 'ProductConfigurator → useCart().addItem({ id: "saatva-classic" })' });
+    if (cartQty >= CART_MAX) {
+      await hop('ctx', 'ctx', 'addLine → refused', { kind: 'err', ms: 1, note: 'Line already at ' + CART_MAX + ': cart unchanged, returns "max"' });
+      await hop('ctx', 'browser', 'status message', { kind: 'err', ms: 2, note: 'aria-live: "You can add up to ' + CART_MAX + ' of this mattress"; count stays ' + cartQty });
+      return;
+    }
+    await hop('ctx', 'ctx', 'addLine(cart, id)', { kind: 'work', ms: 1, note: cartQty ? 'Existing line: quantity ' + cartQty + ' → ' + (cartQty + 1) : 'No line yet: push { productId, quantity: 1 }' });
+    cartQty++;
+    await hop('ctx', 'ls', 'setItem(saatva.cart.v1)', { ms: 2, body: cartJson(cartQty) });
+    renderCart();
+    await hop('ls', 'ctx', 'stored', { kind: 'res', ms: 1, note: 'Write ok (if blocked/full: warn and keep the cart in memory)' });
+    await hop('ctx', 'ctx', 'emit() → subscribers', { kind: 'work', ms: 1, note: 'useSyncExternalStore sees a new snapshot; parsed cart cached by its raw string' });
+    await hop('ctx', 'browser', 'HeaderCart re-renders', { kind: 'res', ms: 2, note: 'Header: ' + badge(cartQty) + ', aria-label "Cart, ' + cartQty + (cartQty === 1 ? ' item' : ' items') + '"; status "Added Saatva Classic to your cart"', body: { count: cartQty, hydrated: true } });
+  } },
+  { id: 'refresh', label: 'Refresh the page', run: async () => {
+    header('Hard refresh with ' + cartQty + ' in the cart');
+    await hop('browser', 'web', 'GET /', { note: 'Server renders with the server snapshot: an empty cart, so no badge in the HTML' });
+    await hop('web', 'browser', '200 HTML', { kind: 'res', ms: 2, note: 'First client render uses the same empty snapshot: no hydration mismatch, no flash of a wrong count' });
+    await hop('browser', 'ctx', 'hydrate', { note: 'CartProvider mounts; getSnapshot() reads the real cart' });
+    await hop('ctx', 'ls', 'getItem(saatva.cart.v1)', { ms: 1 });
+    await hop('ls', 'ctx', cartQty ? 'stored cart' : 'null', { kind: 'res', ms: 1, body: cartJson(cartQty) });
+    await hop('ctx', 'ctx', 'parseCart + prune', { kind: 'work', ms: 1, note: 'Bad JSON → empty; invalid lines dropped; qty clamped 1–' + CART_MAX + '; unknown ids pruned once /api/products ids are known' });
+    await hop('ctx', 'browser', 'HeaderCart re-renders', { kind: 'res', ms: 2, note: 'hydrated = true → ' + badge(cartQty), body: { count: cartQty, hydrated: true } });
+  } },
+  { id: 'emptycart', label: 'Clear cart (reset demo)', run: async () => { cartQty = 0; renderCart(); header('Demo cart reset to empty'); } },
+];
+
 const fmt = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + ' s' : v + ' ms');
 function syncOut() { $('#latCatO').textContent = fmt($v('latCat')); $('#latConO').textContent = fmt($v('latCon')); $('#tmoO').textContent = fmt($v('tmo')); }
 for (const id of ['latCat', 'latCon', 'tmo']) $('#' + id).oninput = syncOut;
@@ -320,6 +379,8 @@ function run(fn) {
   queue = queue.then(fn).catch(console.error).finally(() => { if (--busy === 0) $('#runstate').textContent = 'idle'; });
 }
 build(); showDetails();
+SCENARIOS.push(...CART_SCENARIOS);
+renderCart();
 $('#scenarios').innerHTML = SCENARIOS.map((s) => `<button class="act${s.primary ? ' primary' : ''}" data-id="${s.id}">${esc(s.label)}</button>`).join('');
 $('#scenarios').onclick = (e) => { const b = e.target.closest('button'); if (b) run(SCENARIOS.find((s) => s.id === b.dataset.id).run); };
 $('#speed').onchange = (e) => { speed = +e.target.value; };

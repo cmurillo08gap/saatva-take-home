@@ -1,6 +1,6 @@
 # Phase 2: Configurator UI
 
-**Status:** Ready for review · **Specs:** R2 (and R1 display) · C1 C2 · **Depends on:** Phase 1
+**Status:** Accepted · **Specs:** R2 (and R1 display) · C1 C2 · **Depends on:** Phase 1
 
 ## Goal
 

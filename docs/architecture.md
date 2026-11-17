@@ -8,6 +8,8 @@ flowchart LR
   subgraph web["apps/web · Next.js · :3000"]
     RSC["page.tsx · server component"]
     PCF["ProductConfigurator · client"]
+    CP["CartProvider · localStorage"]
+    HC["HeaderCart · client"]
     RW["rewrites(): /api/* → BFF"]
   end
   subgraph api["apps/api · NestJS · :4000 /api"]
@@ -23,6 +25,8 @@ flowchart LR
   CT[["packages/contracts · types only"]]
   B --> RSC
   RSC -->|"products, initialProductId"| PCF
+  PCF -->|"addItem, prune"| CP
+  CP -->|"count"| HC
   B -->|"fetch('/api/…')"| RW --> PC
   RSC -->|"apiGet(), server-side"| PC
   PC --> PS --> UC
@@ -52,14 +56,24 @@ flowchart LR
 - **Description HTML** is rendered only by `components/RichText.tsx`, which trusts the BFF's allowlist sanitization. It is the single `dangerouslySetInnerHTML` in the web app.
 - **Loading** is `app/loading.tsx`, a skeleton with the same grid as the configurator. **Failure** (BFF `503`, network error or an empty list) renders `ProductsUnavailable` with a "Try again" link; the error is logged on the server only.
 - **Layout** is one CSS grid: two columns from 768px, stacked below it (title, selector, image, details, button).
-- **Prices** are formatted in `lib/format.ts` from the BFF's integer cents; the web app never computes prices. The header cart count is a static `0` until the cart lands.
+- **Prices** are formatted in `lib/format.ts` from the BFF's integer cents; the web app never computes prices.
 - `apps/web` imports `@saatva/contracts` with `import type` only.
+
+## Cart
+
+The cart lives in the browser's `localStorage` (key `saatva.cart.v1`); there is no cart endpoint and no database (C3). A line is `{ productId, quantity }` only, so names, images and prices are always joined from `/api/products` and totals (Phase 4) use current prices.
+
+- `lib/cart.ts` is pure: `parseCart` (corrupt JSON or shape → empty cart, bad lines dropped, quantities clamped to 1–10, duplicate ids merged), `addLine`, `pruneCart`, `cartCount`, and try/catch `readCart` / `writeCart`. If storage is unavailable or full, the cart stays in memory for the session and a warning is logged.
+- `components/CartProvider.tsx` (in the root layout) is an external store read with `useSyncExternalStore`. The server snapshot is an empty cart, so hydration matches; the `storage` event syncs other tabs. `useCart()` exposes `cart`, `count`, `hydrated`, `addItem` (`'added' | 'max'`) and `prune`.
+- `HeaderCart` (client) shows the badge only when hydrated and the count is above 0; `Header` stays a server component.
+- `ProductConfigurator` adds the selected mattress, announces the result in an `aria-live` status, and prunes unknown ids on mount. Cap: 10 per line.
+- Trade-offs for the C3 discussion: per browser only, the server can't render the count, and a real checkout must re-price server-side. A BFF-owned cart behind the same context is the upgrade path.
 
 ## Where things are
 
 - `packages/contracts/index.d.ts`: shared response types, imported with `import type`.
 - `apps/web/app/`: `page.tsx` (data), `loading.tsx`, `globals.css` (tokens and all styles).
-- `apps/web/components/`: `ProductConfigurator`, `PriceTag`, `StarRating`, `RichText`, `ProductsUnavailable`, `Header`; `apps/web/lib/`: `api.ts`, `format.ts`.
+- `apps/web/components/`: `ProductConfigurator`, `PriceTag`, `StarRating`, `RichText`, `ProductsUnavailable`, `Header`, `HeaderCart`, `CartProvider`; `apps/web/lib/`: `api.ts`, `format.ts`, `cart.ts`.
 - `apps/api/src/products/`: controller, service, `product.mapper.ts` (pure mapping functions).
 - `apps/api/src/upstream/`: client (with request timeout) and provider types.
 
